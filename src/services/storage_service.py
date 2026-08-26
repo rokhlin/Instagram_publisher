@@ -1,5 +1,6 @@
 import os
 import uuid
+import mimetypes
 import logging
 from typing import Optional
 import boto3
@@ -27,25 +28,31 @@ class StorageService:
             )
 
     def _init_s3_client(self):
-        if (
-            settings.S3_ACCESS_KEY_ID
-            and settings.S3_SECRET_ACCESS_KEY
-            and settings.S3_BUCKET_NAME
-        ):
+        endpoint = settings.s3_or_r2_endpoint
+        access_key = settings.s3_or_r2_access_key
+        secret_key = settings.s3_or_r2_secret_key
+        bucket = settings.s3_or_r2_bucket
+
+        if access_key and secret_key and bucket:
             client_kwargs = {
                 "service_name": "s3",
-                "aws_access_key_id": settings.S3_ACCESS_KEY_ID,
-                "aws_secret_access_key": settings.S3_SECRET_ACCESS_KEY,
+                "aws_access_key_id": access_key,
+                "aws_secret_access_key": secret_key,
                 "config": Config(signature_version="s3v4"),
             }
-            if settings.S3_ENDPOINT_URL:
-                client_kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+            if endpoint:
+                client_kwargs["endpoint_url"] = endpoint
 
             try:
                 self.s3_client = boto3.client(**client_kwargs)
-                logger.info(f"Initialized S3 storage client for bucket '{settings.S3_BUCKET_NAME}'")
+                service_label = "Cloudflare R2" if self.storage_type == "r2" or "r2.cloudflarestorage.com" in (endpoint or "") else "S3"
+                logger.info(
+                    f"Initialized {service_label} client. Bucket: '{bucket}', Endpoint: '{endpoint or 'AWS Default'}'"
+                )
             except Exception as e:
-                logger.error(f"Failed to initialize S3 client: {e}")
+                logger.error(f"Failed to initialize S3/R2 client: {e}")
+        else:
+            logger.warning("S3/R2 storage selected, but credentials or bucket name are incomplete.")
 
     async def upload_image(self, image_bytes: bytes, filename: Optional[str] = None) -> str:
         """
@@ -74,32 +81,39 @@ class StorageService:
             logger.info(f"Saved image to local storage: {local_path} -> Public URL: {public_url}")
             return public_url
 
-        # 2. S3 / R2 STORAGE MODE
-        if self.s3_client and settings.S3_BUCKET_NAME:
+        # 2. S3 / CLOUDFLARE R2 STORAGE MODE
+        bucket = settings.s3_or_r2_bucket
+        if self.s3_client and bucket:
             try:
+                content_type, _ = mimetypes.guess_type(filename)
+                if not content_type:
+                    content_type = "image/jpeg"
+
                 self.s3_client.put_object(
-                    Bucket=settings.S3_BUCKET_NAME,
+                    Bucket=bucket,
                     Key=filename,
                     Body=image_bytes,
-                    ContentType="image/jpeg",
+                    ContentType=content_type,
                 )
 
-                if settings.S3_PUBLIC_DOMAIN:
-                    public_domain = settings.S3_PUBLIC_DOMAIN.rstrip("/")
-                    public_url = f"{public_domain}/{filename}"
-                elif settings.S3_ENDPOINT_URL:
-                    public_url = f"{settings.S3_ENDPOINT_URL.rstrip('/')}/{settings.S3_BUCKET_NAME}/{filename}"
-                else:
-                    public_url = f"https://{settings.S3_BUCKET_NAME}.s3.amazonaws.com/{filename}"
+                public_domain = settings.s3_or_r2_public_domain
+                endpoint = settings.s3_or_r2_endpoint
 
-                logger.info(f"Uploaded image to S3 bucket '{settings.S3_BUCKET_NAME}': {public_url}")
+                if public_domain:
+                    public_url = f"{public_domain.rstrip('/')}/{filename}"
+                elif endpoint:
+                    public_url = f"{endpoint.rstrip('/')}/{bucket}/{filename}"
+                else:
+                    public_url = f"https://{bucket}.s3.amazonaws.com/{filename}"
+
+                logger.info(f"Uploaded media to S3/R2 bucket '{bucket}': {public_url}")
                 return public_url
             except Exception as e:
-                logger.error(f"S3 upload error: {e}")
-                raise RuntimeError(f"Failed to upload media to S3: {e}")
+                logger.error(f"S3/R2 upload error: {e}")
+                raise RuntimeError(f"Failed to upload media to S3/R2: {e}")
 
         raise ValueError(
-            f"STORAGE_TYPE is '{self.storage_type}', but S3 credentials/bucket are not properly configured in .env."
+            f"STORAGE_TYPE is '{self.storage_type}', but S3/R2 credentials or bucket name are missing in .env."
         )
 
 
