@@ -30,18 +30,18 @@ def is_user_allowed(user_id: int) -> bool:
 @router.message(CommandStart())
 async def handle_start(message: types.Message, state: FSMContext):
     if not is_user_allowed(message.from_user.id):
-        await message.answer("⛔ Извините, у вас нет доступа к этому боту.")
+        await message.answer("⛔ Access denied. You are not authorized to use this bot.")
         return
 
     await state.clear()
     await state.set_state(PostCreationStates.waiting_for_media)
     welcome_text = (
-        "👋 **Добро пожаловать в Instagram AutoPosting Bot!**\n\n"
-        "📸 **Как опубликовать пост/историю:**\n"
-        "1. Прикрепите фото к сообщению.\n"
-        "2. В подписи к фото укажите тему, ключевые мысли или оставьте пустым для автогенерации.\n"
-        "3. Выберите формат (Stories 9:16, Лента 4:5 или 1:1).\n"
-        "4. Проверьте превью и подтвердите публикацию!"
+        "👋 **Welcome to Instagram AutoPosting Bot!**\n\n"
+        "📸 **How to publish a post or story:**\n"
+        "1. Attach and send a photo.\n"
+        "2. Add your topic, thoughts, or notes to the photo caption (or leave blank for auto-generation).\n"
+        "3. Choose the publishing format (Stories 9:16, Feed 4:5, or Square 1:1).\n"
+        "4. Review the preview and confirm publication!"
     )
     await message.answer(welcome_text, parse_mode="Markdown")
 
@@ -50,7 +50,7 @@ async def handle_start(message: types.Message, state: FSMContext):
 async def handle_cancel_cmd(message: types.Message, state: FSMContext):
     await state.clear()
     await state.set_state(PostCreationStates.waiting_for_media)
-    await message.answer("🔄 Текущее действие отменено. Отправьте новое фото для создания публикации.")
+    await message.answer("🔄 Current action cancelled. Send a new photo to create a publication.")
 
 
 @router.message(PostCreationStates.waiting_for_media, F.photo)
@@ -75,7 +75,7 @@ async def handle_media_received(message: types.Message, state: FSMContext, bot: 
     await state.set_state(PostCreationStates.waiting_for_format)
 
     await message.answer(
-        "📐 **Выберите формат публикации в Instagram:**",
+        "📐 **Choose Instagram publication format:**",
         reply_markup=get_format_keyboard(),
         parse_mode="Markdown"
     )
@@ -90,7 +90,7 @@ async def handle_format_selected(callback: types.CallbackQuery, state: FSMContex
     raw_image_bytes = data["raw_image_bytes"]
     user_topic = data.get("user_topic", "")
 
-    status_msg = await callback.message.edit_text("⏳ Обрабатываю фото и генерирую текст через AI...")
+    status_msg = await callback.message.edit_text("⏳ Processing image and generating AI caption...")
 
     # 1. Process image
     is_story = (post_type == "STORY")
@@ -117,14 +117,14 @@ async def handle_format_selected(callback: types.CallbackQuery, state: FSMContex
 
     format_labels = {
         "STORY": "📱 Stories (9:16)",
-        "FEED_PORTRAIT": "🖼 Пост в ленту (4:5)",
-        "FEED_SQUARE": "⏹ Пост в ленту (1:1)"
+        "FEED_PORTRAIT": "🖼 Feed Post (4:5)",
+        "FEED_SQUARE": "⏹ Feed Post (1:1)"
     }
     format_name = format_labels.get(post_type, post_type)
 
     preview_file = BufferedInputFile(processed_image_bytes, filename="preview.jpg")
     preview_text = (
-        f"📋 **Предварительный просмотр ({format_name})**\n\n"
+        f"📋 **Preview ({format_name})**\n\n"
         f"{caption}"
     )
 
@@ -145,13 +145,13 @@ async def handle_publish(callback: types.CallbackQuery, state: FSMContext):
     is_story = data.get("is_story", False)
 
     await callback.message.edit_reply_markup(reply_markup=None)
-    progress_msg = await callback.message.answer("🚀 **Публикация...**\n1/2 Загрузка изображения в облако...")
+    progress_msg = await callback.message.answer("🚀 **Publishing...**\n1/2 Uploading image to cloud storage...")
 
     try:
         # Step 1: Upload to public S3 / Cloudflare R2
         public_url = await storage_service.upload_image(processed_image_bytes)
         
-        await progress_msg.edit_text("🚀 **Публикация...**\n2/2 Отправка в Instagram Graph API...")
+        await progress_msg.edit_text("🚀 **Publishing...**\n2/2 Sending to Meta Graph API...")
 
         # Step 2: Create media container
         creation_id = await instagram_service.create_media_container(
@@ -163,12 +163,12 @@ async def handle_publish(callback: types.CallbackQuery, state: FSMContext):
         # Step 3: Publish container
         post_id = await instagram_service.publish_container(creation_id)
 
-        target_type_str = "История (Story)" if is_story else "Пост в ленту"
+        target_type_str = "Story" if is_story else "Feed Post"
         success_msg = (
-            f"🎉 **Успешно опубликовано!**\n\n"
-            f"• **Тип:** {target_type_str}\n"
-            f"• **ID публикации:** `{post_id}`\n\n"
-            f"Отправьте следующее фото, чтобы создать новую публикацию."
+            f"🎉 **Published successfully!**\n\n"
+            f"• **Type:** {target_type_str}\n"
+            f"• **Publication ID:** `{post_id}`\n\n"
+            f"Send another photo to create a new publication."
         )
         await progress_msg.edit_text(success_msg, parse_mode="Markdown")
         await state.clear()
@@ -177,7 +177,7 @@ async def handle_publish(callback: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         logger.exception("Error during Instagram publishing")
         await progress_msg.edit_text(
-            f"❌ **Ошибка при публикации:**\n`{str(e)}`\n\nПопробуйте снова или отредактируйте параметры.",
+            f"❌ **Publishing Error:**\n`{str(e)}`\n\nTry again or edit parameters.",
             reply_markup=get_approval_keyboard(),
             parse_mode="Markdown"
         )
@@ -185,7 +185,7 @@ async def handle_publish(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(PostCreationStates.waiting_for_approval, F.data == "act_regenerate")
 async def handle_regenerate(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("🔄 Перегенерация текста...")
+    await callback.answer("🔄 Regenerating caption...")
     data = await state.get_data()
     user_topic = data.get("user_topic", "")
     post_type = data.get("post_type", "STORY")
@@ -197,11 +197,18 @@ async def handle_regenerate(callback: types.CallbackQuery, state: FSMContext):
     )
     await state.update_data(caption=new_caption)
 
+    format_labels = {
+        "STORY": "📱 Stories (9:16)",
+        "FEED_PORTRAIT": "🖼 Feed Post (4:5)",
+        "FEED_SQUARE": "⏹ Feed Post (1:1)"
+    }
+    format_name = format_labels.get(post_type, post_type)
+
     preview_file = BufferedInputFile(processed_image_bytes, filename="preview.jpg")
     await callback.message.delete()
     await callback.message.answer_photo(
         photo=preview_file,
-        caption=f"📋 **Обновлённый текст:**\n\n{new_caption}",
+        caption=f"📋 **Preview ({format_name})**\n\n{new_caption}",
         reply_markup=get_approval_keyboard(),
         parse_mode="Markdown"
     )
@@ -212,7 +219,7 @@ async def handle_start_edit(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(PostCreationStates.waiting_for_edit)
     await callback.message.answer(
-        "✏️ **Отправьте в ответ сообщение с новым текстом публикации:**",
+        "✏️ **Send a message with your updated caption text:**",
         reply_markup=get_cancel_keyboard(),
         parse_mode="Markdown"
     )
@@ -226,11 +233,51 @@ async def handle_custom_text(message: types.Message, state: FSMContext):
 
     data = await state.get_data()
     processed_image_bytes = data["processed_image_bytes"]
+    post_type = data.get("post_type", "STORY")
+    format_labels = {
+        "STORY": "📱 Stories (9:16)",
+        "FEED_PORTRAIT": "🖼 Feed Post (4:5)",
+        "FEED_SQUARE": "⏹ Feed Post (1:1)"
+    }
+    format_name = format_labels.get(post_type, post_type)
+
     preview_file = BufferedInputFile(processed_image_bytes, filename="preview.jpg")
 
     await message.answer_photo(
         photo=preview_file,
-        caption=f"📋 **Обновлённое превью:**\n\n{new_caption}",
+        caption=f"📋 **Preview ({format_name})**\n\n{new_caption}",
+        reply_markup=get_approval_keyboard(),
+        parse_mode="Markdown"
+    )
+
+
+@router.callback_query(F.data == "act_back_to_preview")
+async def handle_back_to_preview(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    data = await state.get_data()
+    processed_image_bytes = data.get("processed_image_bytes")
+    if not processed_image_bytes:
+        await handle_cancel(callback, state)
+        return
+
+    caption = data.get("caption", "")
+    post_type = data.get("post_type", "STORY")
+    format_labels = {
+        "STORY": "📱 Stories (9:16)",
+        "FEED_PORTRAIT": "🖼 Feed Post (4:5)",
+        "FEED_SQUARE": "⏹ Feed Post (1:1)"
+    }
+    format_name = format_labels.get(post_type, post_type)
+
+    await state.set_state(PostCreationStates.waiting_for_approval)
+    preview_file = BufferedInputFile(processed_image_bytes, filename="preview.jpg")
+
+    if callback.message:
+        await callback.message.delete()
+
+    await callback.message.answer_photo(
+        photo=preview_file,
+        caption=f"📋 **Preview ({format_name})**\n\n{caption}",
         reply_markup=get_approval_keyboard(),
         parse_mode="Markdown"
     )
@@ -243,4 +290,4 @@ async def handle_cancel(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(PostCreationStates.waiting_for_media)
     if callback.message:
         await callback.message.delete()
-    await callback.message.answer("🚫 Создание публикации отменено. Отправьте фото, когда будете готовы.")
+    await callback.message.answer("🚫 Publication creation cancelled. Send a photo whenever you are ready.")

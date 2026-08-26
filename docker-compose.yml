@@ -1,4 +1,7 @@
 services:
+  # ==============================================================================
+  # Primary Service: Instagram Telegram Bot
+  # ==============================================================================
   instagram-bot:
     build:
       context: .
@@ -7,14 +10,46 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    # Port is only needed when STORAGE_TYPE=local and LOCAL_SERVER_ENABLED=true
     ports:
-      # Expose port for local media server (if LOCAL_SERVER_ENABLED=true)
-      - "3018:3018"
+      - "127.0.0.1:3018:3018"
     volumes:
-      # Map host directory to container storage directory
       - ./data/media:/app/data/media
+    networks:
+      - bot-network
+    # Resource constraints (server protection)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 128M
+    # Log rotation (prevents disk space exhaustion)
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
+
+  # ==============================================================================
+  # Optional Service: Cloudflare Tunnel (Secured HTTPS without opening ports)
+  # Launch: docker compose --profile tunnel up -d
+  # ==============================================================================
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflare_media_tunnel
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    networks:
+      - bot-network
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    command: tunnel run
+    depends_on:
+      - instagram-bot
+
+networks:
+  bot-network:
+    driver: bridge

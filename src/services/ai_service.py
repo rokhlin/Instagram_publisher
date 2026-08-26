@@ -4,19 +4,19 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Ты — профессиональный SMM-копирайтер и контент-креатор для душевного и эстетичного личного блога в Instagram.
-Темы блога:
-1. Семья (Family & Warmth): Искренние совместные моменты, эмоции детей, традиции.
-2. Путешествия (Travel & Memories): Панорамные виды, впечатления от новых мест, путевые заметки.
-3. Любовь к природе (Nature & Harmony): Пейзажи, закаты, море, прогулки на воздухе.
-4. Развлечения и досуг (Entertainment & Fun): Яркие выходные, активный отдых.
+SYSTEM_PROMPT = """You are a professional social media copywriter and content creator for a warm, aesthetic personal Instagram blog.
+Blog themes:
+1. Family & Warmth: Genuine shared moments, kids' emotions, traditions, and togetherness.
+2. Travel & Memories: Scenic views, impressions from new places, travel diary notes.
+3. Nature & Harmony: Landscapes, sunsets, sea, outdoor walks, tranquility.
+4. Entertainment & Fun: Vibrant weekends, activities, leisure time.
 
-Твоя задача — по описанию или теме от пользователя составить привлекательный пост для Instagram.
-Формат ответа:
-- Заголовок с эмодзи.
-- Основной текст (2-4 абзаца, живой, теплый, без банальных клише).
-- Интерактивный вопрос или призыв к общению в конце.
-- Блок хэштегов (8-15 релевантных хэштегов на русском и английском языках).
+Your task is to craft an engaging, aesthetic Instagram post based on the user's topic or image description.
+Output format:
+- Catchy headline with emojis.
+- Body text (2-4 paragraphs, lively, warm, conversational, authentic).
+- Interactive question or call-to-action at the end.
+- Hashtag block (8-15 relevant and trending hashtags in English).
 """
 
 class AIService:
@@ -37,10 +37,10 @@ class AIService:
             return self._fallback_caption(user_topic, post_format)
 
         prompt = f"""
-Создай пост для формата: {'Instagram Stories' if post_format == 'STORY' else 'Пост в ленту Instagram'}.
-Пожелания/тема автора: {user_topic if user_topic else 'Семейный теплый момент / яркие воспоминания'}.
+Create a post for format: {'Instagram Stories' if post_format == 'STORY' else 'Instagram Feed Post'}.
+User prompt/topic: {user_topic if user_topic else 'Warm family moment / scenic travel memory'}.
 
-Сгенерируй готовый текст поста с подходящими эмодзи, интерактивом и хэштегами.
+Generate a complete post caption with suitable emojis, an engaging question, and hashtags.
 """
         try:
             # Using google-genai SDK
@@ -58,13 +58,13 @@ class AIService:
             return self._fallback_caption(user_topic, post_format)
 
     def _fallback_caption(self, user_topic: str, post_format: str) -> str:
-        topic_text = f"Тема: {user_topic}\n\n" if user_topic else ""
+        topic_text = f"Topic: {user_topic}\n\n" if user_topic else ""
         return (
-            f"Заново открываем мир вместе ✨🌍\n\n"
+            f"Rediscovering the world together ✨🌍\n\n"
             f"{topic_text}"
-            f"Каждый день дарит нам новые моменты, которые хочется сохранить в памяти надолго.\n\n"
-            f"📍 Вопрос дня: А как проходят ваши выходные?\n\n"
-            f"#family #travel #nature #moments #lifestyle #семья #путешествия #вдохновение"
+            f"Every single day brings new moments that are truly worth keeping in our hearts forever.\n\n"
+            f"📍 Question of the day: How are you spending your week?\n\n"
+            f"#family #travel #nature #moments #lifestyle #wanderlust #memories #inspiration"
         )
 
 

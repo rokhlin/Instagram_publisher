@@ -1,106 +1,106 @@
-# Руководство по автоматизации контента и постинга в Instagram через Telegram-бота
+# Guide: Content Automation and Instagram Auto-Posting via Telegram Bot
 
 ---
 
-## 1. Концепция и тематика личного блога
+## 1. Concept and Themes for a Personal Blog
 
-### Направления контента
-* **Семья (Family & Warmth):** Искренние совместные моменты, эмоции детей, семейные традиции и прогулки.
-* **Путешествия (Travel & Memories):** Панорамные виды, впечатления от новых мест, дорожные заметки.
-* **Любовь к природе (Nature & Harmony):** Пейзажи, закаты, море, прогулки на свежем воздухе.
-* **Развлечения и досуг (Entertainment & Fun):** Мероприятия, активный отдых, яркие выходные.
+### Content Pillars
+* **Family & Warmth:** Sincere family moments, children's emotions, family traditions, and outdoor walks.
+* **Travel & Memories:** Panoramic views, impressions from new places, travel notes.
+* **Nature & Harmony:** Landscapes, sunsets, sea, open-air walks.
+* **Entertainment & Fun:** Events, active leisure, vibrant weekend activities.
 
-### Форматы публикаций
-* **Instagram Stories:** Соотношение сторон `9:16` (1080×1920 px). Текст и стикеры располагаются в центральной трети экрана, чтобы не перекрываться интерфейсом Instagram.
-* **Посты в ленту (Feed Posts):** Соотношение сторон `4:5` (1080×1350 px) или `1:1` (1080×1080 px).
+### Publication Formats
+* **Instagram Stories:** Aspect ratio `9:16` (1080×1920 px). Text and stickers should be positioned within the central third of the screen to avoid overlay issues with Instagram UI elements.
+* **Feed Posts:** Aspect ratio `4:5` (1080×1350 px) or `1:1` (1080×1080 px).
 
 ---
 
-## 2. Скрипт автоматической подготовки медиа (Python / Pillow)
+## 2. Automated Media Preparation Script (Python / Pillow)
 
-Скрипт автоматически обрезает фото под пропорции Stories (`9:16`) с центрированием и базовой коррекцией контраста и цвета:
+The script automatically crops photos to Stories proportions (`9:16`) with center-cropping and basic contrast/color auto-enhancement:
 
 ```python
 from PIL import Image, ImageEnhance, ImageOps
 
 def prepare_story_image(input_path: str, output_path: str):
-    """Кадрирование и коррекция фото для Instagram Stories (1080x1920)."""
+    """Crop and enhance photo for Instagram Stories (1080x1920)."""
     img = Image.open(input_path).convert('RGB')
     
-    # Целевой размер 9:16
+    # Target size 9:16
     target_size = (1080, 1920)
     img_cropped = ImageOps.fit(img, target_size, centering=(0.5, 0.5))
     
-    # Легкое усиление контраста и цвета
+    # Subtle contrast and color enhancement
     img_contrast = ImageEnhance.Contrast(img_cropped).enhance(1.08)
     img_final = ImageEnhance.Color(img_contrast).enhance(1.05)
     
     img_final.save(output_path, quality=95)
-    print(f"Файл сохранен: {output_path}")
+    print(f"File saved: {output_path}")
 ```
 
 ---
 
-## 3. Настройка Instagram Graph API для автопостинга
+## 3. Instagram Graph API Setup for Auto-Posting
 
-### Шаг 1: Подготовка аккаунтов
-1. Переведите профиль Instagram в **Профессиональный аккаунт** (*Автор* или *Бизнес*).
-2. Привяжите аккаунт Instagram к бизнес-странице в Facebook.
+### Step 1: Account Preparation
+1. Switch your Instagram profile to a **Professional Account** (*Creator* or *Business*).
+2. Connect your Instagram account to a Facebook Business Page.
 
-### Шаг 2: Создание приложения в Meta for Developers
-1. Создайте приложение с типом **Business** на [developers.facebook.com](https://developers.facebook.com/).
-2. Добавьте продукт **Instagram Graph API**.
-3. Назначьте необходимые разрешения (**Permissions**):
+### Step 2: Create an App in Meta for Developers
+1. Create an app with the **Business** type at [developers.facebook.com](https://developers.facebook.com/).
+2. Add the **Instagram Graph API** product.
+3. Add the required permissions (**Permissions**):
    * `instagram_basic`
    * `instagram_content_publish`
    * `pages_read_engagement`
    * `pages_show_list`
 
-### Шаг 3: Получение токенов и ID
-1. В **Graph API Explorer** сгенерируйте *User Access Token* и обменяйте его на долгоживущий *Page Access Token* (или бессрочный токен системного пользователя в Meta Business Manager).
-2. Получите ваш `INSTAGRAM_ACCOUNT_ID`:
+### Step 3: Generating Tokens and IDs
+1. In **Graph API Explorer**, generate a *User Access Token* and exchange it for a long-lived *Page Access Token* (or a permanent system user token in Meta Business Manager).
+2. Retrieve your `INSTAGRAM_ACCOUNT_ID`:
    ```http
-   GET https://graph.facebook.com/v20.0/me/accounts?fields=instagram_business_account
+   GET https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account
    ```
 
-### Шаг 4: Вызовы API для публикации
+### Step 4: API Publishing Calls
 
-#### Создание медиа-контейнера:
+#### Creating a Media Container:
 ```http
-POST https://graph.facebook.com/v20.0/{INSTAGRAM_ACCOUNT_ID}/media
+POST https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/media
 ```
-**Параметры:**
+**Parameters:**
 * `image_url`: `"https://your-public-storage.com/photo.jpg"`
-* `caption`: `"Текст поста #хэштеги"`
+* `caption`: `"Post caption #hashtags"`
 * `access_token`: `"{ACCESS_TOKEN}"`
-* *Для Stories добавьте параметр:* `"media_type": "STORIES"`
+* *For Stories, include the parameter:* `"media_type": "STORIES"`
 
-**Ответ:**
+**Response:**
 ```json
 {
   "id": "CREATION_ID"
 }
 ```
 
-#### Публикация контейнера:
+#### Publishing the Container:
 ```http
-POST https://graph.facebook.com/v20.0/{INSTAGRAM_ACCOUNT_ID}/media_publish
+POST https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/media_publish
 ```
-**Параметры:**
+**Parameters:**
 * `creation_id`: `"{CREATION_ID}"`
 * `access_token`: `"{ACCESS_TOKEN}"`
 
 ---
 
-## 4. Архитектура и реализация Telegram-бота
+## 4. Telegram Bot Architecture and Implementation
 
-### Сценарий работы (FSM)
-1. Пользователь отправляет в Telegram фото/видео и указывает тему/пожелания.
-2. Бот обрабатывает изображение и генерирует текст, стикеры и хэштеги (через LLM/Gemini API).
-3. Бот присылает превью с Inline-кнопками: `[✅ Опубликовать]`, `[✏️ Внести правки]`, `[❌ Отменить]`.
-4. При подтверждении бот отправляет запрос в Instagram Graph API и сообщает об успешной публикации.
+### User Flow (FSM)
+1. The user sends a photo/video in Telegram along with a topic or notes in the caption.
+2. The bot processes the image and generates the text, interactive question, and hashtags (via LLM/Gemini API).
+3. The bot sends a preview with inline buttons: `[🚀 Publish to Instagram]`, `[✏️ Edit Text]`, `[🔄 Regenerate]`, `[❌ Cancel]`.
+4. Upon confirmation, the bot sends requests to the Instagram Graph API and reports successful publication.
 
-### Пример реализации Telegram-бота (aiogram 3 + aiohttp)
+### Telegram Bot Implementation Example (aiogram 3 + aiohttp)
 
 ```python
 import os
@@ -121,25 +121,25 @@ class PostFlow(StatesGroup):
 
 def get_approval_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Опубликовать", callback_data="post_publish")],
-        [InlineKeyboardButton(text="✏️ Внести правки", callback_data="post_edit")],
-        [InlineKeyboardButton(text="❌ Отменить", callback_data="post_cancel")]
+        [InlineKeyboardButton(text="🚀 Publish to Instagram", callback_data="post_publish")],
+        [InlineKeyboardButton(text="✏️ Edit Text", callback_data="post_edit")],
+        [InlineKeyboardButton(text="❌ Cancel", callback_data="post_cancel")]
     ])
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.set_state(PostFlow.waiting_for_media)
-    await message.answer("Отправьте фото/видео и напишите тему или пожелания.")
+    await message.answer("Send a photo/video and optionally include topic or instructions.")
 
 @dp.message(PostFlow.waiting_for_media, F.photo)
 async def handle_media(message: types.Message, state: FSMContext):
     photo = message.photo[-1]
     
-    # Пример структуры сформированного поста
+    # Generated post caption structure
     caption = (
-        "Заново открываем мир вместе 🌍✨\n\n"
-        "📍 Интерактив: Опрос (Да / Нет)\n"
-        "#travel #family #nature"
+        "Rediscovering the world together 🌍✨\n\n"
+        "📍 Question of the day: Where is your favorite weekend getaway?\n\n"
+        "#travel #family #nature #lifestyle"
     )
     
     await state.update_data(file_id=photo.file_id, caption=caption)
@@ -147,7 +147,7 @@ async def handle_media(message: types.Message, state: FSMContext):
     
     await message.answer_photo(
         photo=photo.file_id,
-        caption=f"📋 *Предварительный просмотр:*\n\n{caption}",
+        caption=f"📋 *Preview:*\n\n{caption}",
         parse_mode="Markdown",
         reply_markup=get_approval_keyboard()
     )
@@ -156,29 +156,29 @@ async def handle_media(message: types.Message, state: FSMContext):
 async def process_publish(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("⏳ Публикую в Instagram...")
+    await callback.message.answer("⏳ Publishing to Instagram...")
     
-    # Вызов Instagram Graph API (контейнер + публикация)
+    # Instagram Graph API call (container + publish)
     # publish_result = await publish_to_instagram(...)
     
-    await callback.message.answer("🎉 Пост успешно опубликован!")
+    await callback.message.answer("🎉 Post published successfully!")
     await state.clear()
 
 @dp.callback_query(PostFlow.waiting_for_approval, F.data == "post_edit")
 async def process_edit(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(PostFlow.waiting_for_edit)
-    await callback.message.answer("Напишите, какие правки внести в текст:")
+    await callback.message.answer("Send the updated caption text:")
 
 @dp.message(PostFlow.waiting_for_edit)
 async def apply_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    updated_caption = f"{data['caption']}\n\n_Правка:_ {message.text}"
+    updated_caption = message.text.strip()
     await state.update_data(caption=updated_caption)
     await state.set_state(PostFlow.waiting_for_approval)
     
     await message.answer_photo(
         photo=data['file_id'],
-        caption=f"📋 *Обновлённое превью:*\n\n{updated_caption}",
+        caption=f"📋 *Updated Preview:*\n\n{updated_caption}",
         parse_mode="Markdown",
         reply_markup=get_approval_keyboard()
     )
@@ -187,15 +187,15 @@ async def apply_edit(message: types.Message, state: FSMContext):
 async def process_cancel(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("🚫 Публикация отменена.")
+    await callback.message.answer("🚫 Publication cancelled.")
 ```
 
 ---
 
-## 5. Развертывание и безопасность
+## 5. Deployment and Security
 
-### Конфигурационный файл `.env`
-Размещается в корне проекта на сервере (рядом с `main.py`):
+### Configuration File `.env`
+Place in the project root on your server (alongside `main.py`):
 ```env
 BOT_TOKEN=your_telegram_bot_token
 IG_USER_ID=your_instagram_account_id
@@ -203,7 +203,11 @@ IG_ACCESS_TOKEN=your_long_lived_token
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### Рекомендации:
-1. **Безопасность:** Добавьте `.env` в `.gitignore`. Никогда не публикуйте ключи в открытых репозиториях.
-2. **Хранение медиа:** Для передачи картинок в Instagram API они должны быть доступны по публичному HTTPS URL (Cloudflare R2, AWS S3, Supabase Storage или статический Nginx-каталог вашего сервера).
-3. **Автономность:** Бот запускается в фоновом режиме (через `systemd` или `docker compose`) и работает 24/7.
+### Recommendations:
+1. **Security:** Add `.env` to `.gitignore`. Never commit keys to public repositories.
+2. **Media Storage (Cloudflare R2):**
+   * **Bucket Creation:** In [Cloudflare Dashboard](https://dash.cloudflare.com/) ➔ **Storage & Databases** ➔ **R2** ➔ **Create bucket** (`instagram-media`).
+   * **Public Access:** In bucket ➔ **Settings** ➔ enable **Public Development Domain** (`https://pub-xxx.r2.dev`) or connect a **Custom Domain** (`https://media.yourdomain.com`).
+   * **API Keys:** In **R2** ➔ **Manage R2 API Tokens** ➔ **Create API token** (permissions: *Object Read & Write*) ➔ copy `Account ID`, `Access Key ID`, `Secret Access Key`.
+   * **Configuration in `.env`:** Set `STORAGE_TYPE=r2`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_DOMAIN`.
+3. **Autonomy:** The bot runs in background mode (via `docker compose` or `systemd`) and operates 24/7.

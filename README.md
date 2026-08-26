@@ -1,68 +1,68 @@
 # 📸 Instagram AutoPosting Telegram Bot
 
-Автоматизированный Telegram-бот для подготовки медиа, генерации описаний с помощью искусственного интеллекта (Google Gemini) и публикации постов / историй в Instagram через официальный Meta Graph API.
+An automated Telegram bot for preparing media, generating AI-powered captions with Google Gemini, and publishing posts and stories to Instagram via the official Meta Graph API.
 
 ---
 
-## 🏗 Архитектура проекта
+## 🏗 Project Architecture
 
 ```
 MemoryNMore/
-├── Dockerfile                           # Сборка контейнера Python 3.11-slim
-├── docker-compose.yml                   # Запуск сервиса с монтированием томов
-├── requirements.txt                     # Зависимости проекта
-├── .env.example                         # Шаблон конфигурации
-├── .dockerignore                        # Исключения сборки Docker
-├── Instagram_AutoPosting_Guide.md       # Подробное руководство по концепции и API
+├── Dockerfile                           # Python 3.11-slim container build
+├── docker-compose.yml                   # Service launch with volume mounts
+├── requirements.txt                     # Project dependencies
+├── .env.example                         # Configuration template
+├── .dockerignore                        # Docker build exclusions
+├── Instagram_AutoPosting_Guide.md       # Comprehensive concept & API guide
 └── src/
     ├── __init__.py
-    ├── main.py                          # Точка входа, жизненный цикл бота, сервера и воркера очистки
-    ├── config.py                        # Валидация и загрузка настроек (Pydantic Settings)
+    ├── main.py                          # Entry point, bot lifecycle, media server & cleanup worker
+    ├── config.py                        # Validation & settings loader (Pydantic Settings)
     ├── bot/
     │   ├── __init__.py
-    │   ├── states.py                    # FSM-состояния диалога
-    │   ├── keyboards.py                 # Inline-кнопки (форматы, действия)
-    │   └── handlers.py                  # Обработчики фото, команд и кнопок
+    │   ├── states.py                    # Conversation FSM states
+    │   ├── keyboards.py                 # Inline keyboards (formats, actions)
+    │   └── handlers.py                  # Photo, command, and callback query handlers
     └── services/
         ├── __init__.py
-        ├── image_service.py             # Кадрирование (Stories 9:16, Feed 4:5, 1:1) и автокоррекция (Pillow)
-        ├── ai_service.py                # Генерация текстов и хэштегов (Gemini 2.5 Flash)
-        ├── storage_service.py           # Хранилище: Cloudflare R2, AWS S3 или Локальное хранилище
-        ├── media_server.py              # Защищенный веб-сервер для раздачи локальных медиа
-        ├── cleanup_service.py           # Фоновый воркер автоочистки файлов по TTL
-        └── instagram_service.py         # Вызовы Meta Graph API (создание контейнера + публикация)
+        ├── image_service.py             # Smart cropping (Stories 9:16, Feed 4:5, 1:1) & auto-enhancement (Pillow)
+        ├── ai_service.py                # AI caption & hashtag generation (Gemini 2.5 Flash)
+        ├── storage_service.py           # Storage backends: Cloudflare R2, AWS S3, or Local
+        ├── media_server.py              # Secured HTTP server for serving local media
+        ├── cleanup_service.py           # Background worker for TTL-based media cleanup
+        └── instagram_service.py         # Meta Graph API client (container creation & publishing)
 ```
 
 ---
 
-## 💾 Варианты хранения медиа (`STORAGE_TYPE`)
+## 💾 Media Storage Options (`STORAGE_TYPE`)
 
-Instagram Graph API требует публичную ссылку на изображение (`image_url`) для загрузки контента на серверы Meta.
+The Instagram Graph API requires a publicly accessible image URL (`image_url`) to ingest media onto Meta servers.
 
 ---
 
-### Режим 1: `STORAGE_TYPE=r2` (Cloudflare R2 — Рекомендуется)
-Полностью изолирует ваш сервер, не требует открытия портов и бесплатен (10 ГБ хранилища, 0$ за исходящий трафик).
+### Mode 1: `STORAGE_TYPE=r2` (Cloudflare R2 — Recommended)
+Completely isolates your server, requires no open inbound ports, and is free (10 GB storage included, $0 egress fees).
 
 ```env
 STORAGE_TYPE=r2
 
-# Данные из панели Cloudflare (R2 -> Manage R2 API Tokens)
-R2_ACCOUNT_ID=ваш_account_id_из_панели_cloudflare
-R2_ACCESS_KEY_ID=ваш_r2_access_key_id
-R2_SECRET_ACCESS_KEY=ваш_r2_secret_access_key
+# Credentials from Cloudflare Dashboard (R2 -> Manage R2 API Tokens)
+R2_ACCOUNT_ID=your_account_id_from_cloudflare_dashboard
+R2_ACCESS_KEY_ID=your_r2_access_key_id
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
 R2_BUCKET_NAME=instagram-media
 
-# Публичный домен бакета:
+# Public bucket domain:
 # - Custom Domain: https://media.yourdomain.com
-# - или R2 dev domain: https://pub-xxxxxxxx.r2.dev
+# - or R2 dev domain: https://pub-xxxxxxxx.r2.dev
 R2_PUBLIC_DOMAIN=https://media.yourdomain.com
 ```
 
 ---
 
-### Режим 2: `STORAGE_TYPE=local` (Локальное защищенное хранилище)
-Изображения сохраняются в папку `./data/media` и отдаются встроенным сервером `aiohttp` с многоуровневой защитой:
+### Mode 2: `STORAGE_TYPE=local` (Secured Local Storage)
+Images are saved in `./data/media` and served by an embedded `aiohttp` web server with multi-layered security:
 
 ```env
 STORAGE_TYPE=local
@@ -72,75 +72,156 @@ LOCAL_SERVER_ENABLED=true
 LOCAL_SERVER_PORT=3018
 ```
 
-#### 🛡 Встроенные механизмы защиты локального сервера:
-1. **Защита от Directory Traversal:** Проверка канонических путей (`os.path.commonpath`), блокировка попыток перехода `../` за пределы разрешенной папки.
-2. **Блокировка скрытых файлов:** Запрет доступа к любым файлам, начинающимся с точки (`.gitkeep`, `.env`, `.gitignore`).
-3. **Белый список расширений (Whitelist):** Разрешена отдача только медиафайлов (`.jpg`, `.jpeg`, `.png`, `.webp`, `.mp4`, `.mov`).
-4. **Ограничение HTTP-методов:** Разрешены только `GET` и `HEAD`. Все остальные методы (`POST`, `PUT`, `DELETE` и др.) блокируются со статусом `405 Method Not Allowed`.
-5. **Заголовки безопасности:** Автоматическая отправка `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy`.
-6. **Отключение листинга директорий:** Запрос к корню или папкам возвращает `404 Not Found`.
+#### 🛡 Built-in Local Server Security Features:
+1. **Directory Traversal Protection:** Canonical path validation (`os.path.commonpath`), blocking `../` escape attempts outside the allowed directory.
+2. **Hidden File Access Prevention:** Blocks access to any dotfiles (`.gitkeep`, `.env`, `.gitignore`).
+3. **Extension Whitelisting:** Serves only allowed media file extensions (`.jpg`, `.jpeg`, `.png`, `.webp`, `.mp4`, `.mov`).
+4. **HTTP Method Restriction:** Only `GET` and `HEAD` requests are permitted. All other methods (`POST`, `PUT`, `DELETE`, etc.) return `405 Method Not Allowed`.
+5. **Security Headers:** Automatically sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Content-Security-Policy`.
+6. **Directory Listing Disabled:** Requests to directory paths or root return `404 Not Found`.
 
 ---
 
-### ⏱ Автоматическая очистка файлов (Конфигурируемый TTL)
-Так как Instagram скачивает файл за несколько секунд при публикации, бот оснащен фоновым сервисом очистки:
+### ⏱ Automatic Media Cleanup (Configurable TTL)
+Since Instagram fetches the image in seconds during publication, the bot includes a background cleanup service:
 
 ```env
-# Включение/отключение фоновой очистки (true/false)
+# Enable/disable background cleanup (true/false)
 MEDIA_CLEANUP_ENABLED=true
 
-# Время жизни медиафайлов в минутах (например, 120 = 2 часа)
+# Media time-to-live in minutes (e.g., 120 = 2 hours)
 MEDIA_TTL_MINUTES=120
 
-# Интервал проверки устаревших файлов (в минутах)
+# Cleanup check interval (in minutes)
 MEDIA_CLEANUP_INTERVAL_MINUTES=30
 ```
-Воркер удаляет только устаревшие сгенерированные файлы, сохраняя системные файлы вроде `.gitkeep`.
+The worker only purges expired generated media files while preserving system files such as `.gitkeep`.
 
 ---
 
-## ⚙️ Пошаговая настройка
+## 📖 Step-by-Step Guide: Setting Up Cloudflare R2
 
-### 1. Подготовка Telegram-бота
-1. Напишите [@BotFather](https://t.me/BotFather) в Telegram и создайте нового бота (`/newbot`).
-2. Скопируйте полученный **API Token** (`BOT_TOKEN`).
+Cloudflare R2 is a high-performance, S3-compatible object storage with zero egress fees and a generous free tier (10 GB).
 
-### 2. Настройка Instagram Graph API (Meta)
-1. Переведите профиль Instagram в **Профессиональный аккаунт** (*Автор* или *Бизнес*).
-2. Привяжите аккаунт Instagram к публичной бизнес-странице Facebook.
-3. На [developers.facebook.com](https://developers.facebook.com/) создайте приложение типа **Business**.
-4. Добавьте продукт **Instagram Graph API** и назначьте разрешения:
+### Step 1: Create an R2 Bucket
+1. Log in to your [Cloudflare Dashboard](https://dash.cloudflare.com/).
+2. Navigate to **Storage & Databases** ➔ **R2** in the left sidebar.
+3. Click **Create bucket**.
+4. Enter a bucket name (e.g., `instagram-media`).
+5. Under **Location**, keep *Automatic* or select the closest region (e.g., *Western Europe* / *Eastern Europe* / *North America*).
+6. Click **Create Bucket**.
+
+### Step 2: Configure Public Bucket Access (Public URL)
+Meta's Instagram servers require a public URL to download the media. Choose one of two options:
+
+* **Option A — Quick (R2 Public Development Domain):**
+  1. Inside the created bucket, go to the **Settings** tab.
+  2. Scroll down to the **Public Development Domain** section.
+  3. Click **Enable** and confirm by typing `allow`.
+  4. Copy the generated URL (format: `https://pub-xxxxxxxxxxxxxxxxxxxxxxxx.r2.dev`).
+  5. Set this value as `R2_PUBLIC_DOMAIN` in your `.env`.
+
+* **Option B — Production (Custom Subdomain, e.g., `media.yourdomain.com`):**
+  1. Inside the bucket, go to the **Settings** tab.
+  2. In the **Custom Domains** section, click **Connect Domain**.
+  3. Enter your desired subdomain (e.g., `media.yourdomain.com`).
+  4. Cloudflare will automatically configure DNS records and issue an SSL certificate.
+  5. Set `https://media.yourdomain.com` as `R2_PUBLIC_DOMAIN` in your `.env`.
+
+### Step 3: Generate API Tokens (Access Key & Secret Key)
+1. Return to the main **R2** overview page in Cloudflare.
+2. In the right panel, find **Account ID** and copy it — this is your `R2_ACCOUNT_ID`.
+3. In the right menu, click **Manage R2 API Tokens**.
+4. Click **Create API token**.
+5. Configure the token permissions:
+   * **Token name:** `instagram-bot-token`
+   * **Permissions:** Select **Object Read & Write** (or *Admin Read & Write*).
+   * **Specify bucket(s):** Choose *Apply to all buckets* or restrict to `instagram-media`.
+   * **TTL:** Select *Forever* (or your desired expiration duration).
+6. Click **Create API Token**.
+7. Copy the generated credentials:
+   * **Access Key ID** ➔ `R2_ACCESS_KEY_ID` in `.env`.
+   * **Secret Access Key** ➔ `R2_SECRET_ACCESS_KEY` in `.env`.
+
+---
+
+## ⚙️ Setting Up Other Services
+
+### 1. Telegram Bot Setup
+1. Message [@BotFather](https://t.me/BotFather) on Telegram and create a new bot using `/newbot`.
+2. Copy the generated **API Token** (`BOT_TOKEN`).
+
+### 2. Instagram Graph API Setup (Meta)
+1. Switch your Instagram profile to a **Professional Account** (*Creator* or *Business*).
+2. Connect your Instagram account to a public Facebook Business Page.
+3. In the [Meta for Developers Console](https://developers.facebook.com/), create an app of type **Business**.
+4. Add the **Instagram Graph API** product and request the following permissions:
    - `instagram_basic`
    - `instagram_content_publish`
    - `pages_read_engagement`
    - `pages_show_list`
-5. Получите **Page Access Token** и **Instagram Business Account ID** (`IG_USER_ID`).
+5. Generate a **Page Access Token** and copy your **Instagram Business Account ID** (`IG_USER_ID`).
 
-### 3. Google Gemini API (Опционально)
-1. Получите бесплатный API-ключ в [Google AI Studio](https://aistudio.google.com/).
-2. Укажите его в `GEMINI_API_KEY` для автогенерации текстов постов, вопросов и хэштегов.
+### 3. Google Gemini API (Optional)
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/).
+2. Set it in `GEMINI_API_KEY` for automated caption, question, and hashtag generation.
 
 ---
 
-## 🚀 Запуск через Docker
+## 🚀 Remote Server Deployment (VPS / VDS)
 
-### Шаг 1: Создание `.env`
+### Step 1: Server Preparation (Ubuntu / Debian)
+Connect to your server via SSH and install Docker + Docker Compose:
 ```bash
-cp .env.example .env
-```
-Заполните необходимые параметры в `.env`.
+# Update packages and install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
 
-### Шаг 2: Сборка и запуск контейнера
+# Verify installation
+docker --version
+docker compose version
+```
+
+---
+
+### Step 2: Clone the Repository & Configure `.env`
+```bash
+# Clone the repository to the server
+git clone <YOUR_REPOSITORY_URL> /opt/MemoryNMore
+cd /opt/MemoryNMore
+
+# Create .env from the template
+cp .env.example .env
+nano .env  # or vim .env
+```
+Fill in the parameters in `.env` (Telegram token, Instagram ID/Token, Gemini API Key, Cloudflare R2 or Local settings).
+
+---
+
+### Step 3: Run Containers
+
+#### Option A: Standard Run (Recommended with `STORAGE_TYPE=r2`)
 ```bash
 docker compose up -d --build
 ```
 
-### Шаг 3: Просмотр логов
+#### Option B: Run with Cloudflare Tunnel (for `STORAGE_TYPE=local`)
+If you use local media serving and want secure public HTTPS without opening firewall ports:
+1. Provide your tunnel token in `.env`: `CLOUDFLARE_TUNNEL_TOKEN=your_token`
+2. Start using the `tunnel` profile:
 ```bash
-docker compose logs -f instagram-bot
+docker compose --profile tunnel up -d --build
 ```
 
-### Остановка сервиса
-```bash
-docker compose down
-```
+---
+
+### Step 4: Useful Server Management Commands
+
+| Action | Command |
+| :--- | :--- |
+| **View real-time logs** | `docker compose logs -f instagram-bot` |
+| **Restart bot** | `docker compose restart instagram-bot` |
+| **Stop bot** | `docker compose down` |
+| **Update to latest version** | `git pull && docker compose up -d --build` |
+| **Check container status & resources** | `docker stats instagram_autoposting_bot` |
+| **Auto-restart on server reboot** | Enabled by default (`restart: unless-stopped`) |
