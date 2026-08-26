@@ -54,45 +54,53 @@ class StorageService:
         else:
             logger.warning("S3/R2 storage selected, but credentials or bucket name are incomplete.")
 
-    async def upload_image(self, image_bytes: bytes, filename: Optional[str] = None) -> str:
+    async def upload_media(
+        self,
+        media_bytes: bytes,
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+        is_video: bool = False
+    ) -> str:
         """
-        Uploads/saves image according to STORAGE_TYPE and returns the public URL.
+        Uploads image or video to public storage and returns the public HTTPS URL.
         """
         if not filename:
-            filename = f"post_{uuid.uuid4().hex}.jpg"
+            ext = ".mp4" if is_video else ".jpg"
+            filename = f"media_{uuid.uuid4().hex}{ext}"
 
-        # Always save locally (either as primary storage or backup/cache)
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(filename)
+            if not content_type:
+                content_type = "video/mp4" if is_video or filename.endswith(".mp4") else "image/jpeg"
+
+        # Always save locally (cache / local storage)
         local_path = os.path.join(settings.LOCAL_STORAGE_DIR, filename)
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         with open(local_path, "wb") as f:
-            f.write(image_bytes)
+            f.write(media_bytes)
 
         # 1. LOCAL STORAGE MODE
         if self.storage_type == "local":
             if not settings.LOCAL_PUBLIC_BASE_URL:
                 raise ValueError(
                     "LOCAL_PUBLIC_BASE_URL is not set in .env! "
-                    "Instagram Graph API requires a publicly accessible HTTPS/HTTP image_url. "
+                    "Instagram Graph API requires a publicly accessible HTTPS URL. "
                     "Example: LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com"
                 )
             
             public_base = settings.LOCAL_PUBLIC_BASE_URL.rstrip("/")
             public_url = f"{public_base}/{filename}"
-            logger.info(f"Saved image to local storage: {local_path} -> Public URL: {public_url}")
+            logger.info(f"Saved media to local storage: {local_path} -> Public URL: {public_url}")
             return public_url
 
         # 2. S3 / CLOUDFLARE R2 STORAGE MODE
         bucket = settings.s3_or_r2_bucket
         if self.s3_client and bucket:
             try:
-                content_type, _ = mimetypes.guess_type(filename)
-                if not content_type:
-                    content_type = "image/jpeg"
-
                 self.s3_client.put_object(
                     Bucket=bucket,
                     Key=filename,
-                    Body=image_bytes,
+                    Body=media_bytes,
                     ContentType=content_type,
                 )
 
@@ -115,6 +123,12 @@ class StorageService:
         raise ValueError(
             f"STORAGE_TYPE is '{self.storage_type}', but S3/R2 credentials or bucket name are missing in .env."
         )
+
+    async def upload_image(self, image_bytes: bytes, filename: Optional[str] = None) -> str:
+        """
+        Backwards-compatible wrapper for upload_media for images.
+        """
+        return await self.upload_media(image_bytes, filename=filename, is_video=False)
 
 
 storage_service = StorageService()

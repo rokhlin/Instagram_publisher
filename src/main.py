@@ -33,8 +33,13 @@ async def main():
         cleanup_task = asyncio.create_task(run_cleanup_worker())
 
     # 3. Initialize Telegram Bot and Dispatcher
+    cleaned_token = (settings.BOT_TOKEN or "").strip().strip("'\"")
+    if not cleaned_token:
+        logger.critical("BOT_TOKEN is missing or empty in .env! Please set BOT_TOKEN.")
+        sys.exit(1)
+
     bot = Bot(
-        token=settings.BOT_TOKEN,
+        token=cleaned_token,
         default=DefaultBotProperties(parse_mode="Markdown")
     )
     dp = Dispatcher(storage=MemoryStorage())

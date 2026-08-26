@@ -11,9 +11,14 @@ MemoryNMore/
 ├── Dockerfile                           # Python 3.11-slim container build
 ├── docker-compose.yml                   # Service launch with volume mounts
 ├── requirements.txt                     # Project dependencies
-├── .env.example                         # Configuration template
+├── debug.py                             # Automated diagnostics & health check
 ├── .dockerignore                        # Docker build exclusions
-├── Instagram_AutoPosting_Guide.md       # Comprehensive concept & API guide
+├── .gitignore                           # Git exclusions
+├── config/
+│   ├── .env                             # Active environment configuration (git ignored)
+│   └── .env.example                     # Configuration template
+├── data/
+│   └── media/                           # Local temporary media cache
 └── src/
     ├── __init__.py
     ├── main.py                          # Entry point, bot lifecycle, media server & cleanup worker
@@ -26,7 +31,7 @@ MemoryNMore/
     └── services/
         ├── __init__.py
         ├── image_service.py             # Smart cropping (Stories 9:16, Feed 4:5, 1:1) & auto-enhancement (Pillow)
-        ├── ai_service.py                # AI caption & hashtag generation (Gemini 2.5 Flash)
+        ├── ai_service.py                # AI caption & hashtag generation (Gemini 3.7 Flash)
         ├── storage_service.py           # Storage backends: Cloudflare R2, AWS S3, or Local
         ├── media_server.py              # Secured HTTP server for serving local media
         ├── cleanup_service.py           # Background worker for TTL-based media cleanup

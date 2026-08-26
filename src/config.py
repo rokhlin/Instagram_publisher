@@ -1,11 +1,12 @@
 import os
-from typing import List, Optional
+from typing import List, Optional, Any
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=("config/.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -13,6 +14,14 @@ class Settings(BaseSettings):
     # Telegram Bot
     BOT_TOKEN: str = ""
     ALLOWED_USER_IDS: Optional[str] = ""
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def sanitize_strings(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            cleaned = value.strip().strip("'\"")
+            return cleaned
+        return value
 
     # Instagram Graph API
     IG_USER_ID: str = ""
