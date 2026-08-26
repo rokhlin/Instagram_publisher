@@ -1,0 +1,51 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Application data & generated media
+data/
+data/media/*
+!data/media/.gitkeep
+media/
+downloads/
+temp/
+logs/
+*.log
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Unit test / coverage / cache
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+Desktop.ini

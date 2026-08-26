@@ -1,0 +1,20 @@
+services:
+  instagram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: instagram_autoposting_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Expose port for local media server (if LOCAL_SERVER_ENABLED=true)
+      - "3018:3018"
+    volumes:
+      # Map host directory to container storage directory
+      - ./data/media:/app/data/media
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
