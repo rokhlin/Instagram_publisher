@@ -184,7 +184,11 @@ docker compose version
 
 ---
 
-### Step 2: Clone the Repository & Configure `.env`
+### Step 2: Clone the Repository & Configure Environment Variables
+
+You can pass environment variables in two convenient ways:
+
+#### Way 1: Using `.env` file (Default & Recommended)
 ```bash
 # Clone the repository to the server
 git clone <YOUR_REPOSITORY_URL> /opt/MemoryNMore
@@ -195,6 +199,15 @@ cp .env.example .env
 nano .env  # or vim .env
 ```
 Fill in the parameters in `.env` (Telegram token, Instagram ID/Token, Gemini API Key, Cloudflare R2 or Local settings).
+
+#### Way 2: Directly in `docker-compose.yml` or Shell Environment
+The `docker-compose.yml` file includes a full `environment:` block with fallback interpolation (`${VAR:-default}`). You can:
+- **Hardcode values directly** in the `environment:` section of `docker-compose.yml`.
+- **Pass variables at runtime** without modifying files:
+  ```bash
+  BOT_TOKEN=123:abc IG_USER_ID=456 IG_ACCESS_TOKEN=xyz docker compose up -d --build
+  ```
+- **Use `.env` optionally**: `env_file` is set to `required: false`, so the container will start smoothly whether `.env` exists or variables are defined purely in Docker Compose.
 
 ---
 
