@@ -21,12 +21,26 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write   # Required to create git tags
+      packages: write   # Required to push Docker images to GHCR
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history is required for accurate semver tag resolution
+
+      # Automatically bump patch version & create git tag on push to main/master
+      - name: Bump patch version and create tag
+        id: tag_version
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: main,master
+          tag_prefix: v
+          initial_version: 1.0.0
 
       # Setup QEMU for multi-architecture emulation (x86_64 and ARM64)
       - name: Set up QEMU
@@ -55,6 +69,8 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.tag_version.outputs.new_tag }},enable=${{ steps.tag_version.outputs.new_tag != '' }}
+            type=raw,value=${{ steps.tag_version.outputs.new_version }},enable=${{ steps.tag_version.outputs.new_version != '' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -65,6 +81,7 @@ jobs:
             org.opencontainers.image.title=MemoryNMore Telegram Bot
             org.opencontainers.image.description=Instagram AutoPosting Bot for ZimaOS and Home Servers
             org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.version=${{ steps.tag_version.outputs.new_version || github.sha }}
 
       # Build and push multi-arch image
       - name: Build and push Docker image

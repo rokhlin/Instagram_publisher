@@ -3,6 +3,7 @@ services:
   # Primary Service: Instagram Telegram Bot
   # ==============================================================================
   instagram-bot:
+    image: ghcr.io/rokhlin/instagram_publisher:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,8 +16,8 @@ services:
     ports:
       - "${LOCAL_SERVER_PORT:-3018}:${LOCAL_SERVER_PORT:-3018}"
     volumes:
-      - ./src:/app/src
       - ./data/media:/app/data/media
+      # - ./src:/app/src # Uncomment for local live-code development
     networks:
       - bot-network
     # Resource constraints (server protection)
