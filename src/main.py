@@ -32,12 +32,17 @@ async def main():
     if settings.MEDIA_CLEANUP_ENABLED:
         cleanup_task = asyncio.create_task(run_cleanup_worker())
 
-    # 3. Initialize Telegram Bot and Dispatcher
-    cleaned_token = (settings.BOT_TOKEN or "").strip().strip("'\"")
-    if not cleaned_token:
-        logger.critical("BOT_TOKEN is missing or empty in .env! Please set BOT_TOKEN.")
+    # 3. Validate required configuration for the active mode
+    missing_configs = settings.validate_required_config()
+    if missing_configs:
+        logger.critical(
+            f"Missing required configuration for active STORAGE_TYPE='{settings.STORAGE_TYPE}': "
+            f"{', '.join(missing_configs)}. "
+            "Please provide them via Docker environment variables or in ./config/.env"
+        )
         sys.exit(1)
 
+    cleaned_token = (settings.BOT_TOKEN or "").strip().strip("'\"")
     bot = Bot(
         token=cleaned_token,
         default=DefaultBotProperties(parse_mode="Markdown")

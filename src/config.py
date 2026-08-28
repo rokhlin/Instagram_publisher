@@ -1,12 +1,23 @@
 import os
+from pathlib import Path
 from typing import List, Optional, Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolve path strictly to ./config/.env relative to project layout
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_ENV_PATH = PROJECT_ROOT / "config" / ".env"
+
+try:
+    from dotenv import dotenv_values
+    _file_env = dotenv_values(CONFIG_ENV_PATH) if CONFIG_ENV_PATH.is_file() else {}
+except Exception:
+    _file_env = {}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=("config/.env", ".env"),
+        env_file=CONFIG_ENV_PATH if CONFIG_ENV_PATH.is_file() else "config/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -17,10 +28,16 @@ class Settings(BaseSettings):
 
     @field_validator("*", mode="before")
     @classmethod
-    def sanitize_strings(cls, value: Any) -> Any:
+    def sanitize_and_fallback(cls, value: Any, info) -> Any:
         if isinstance(value, str):
-            cleaned = value.strip().strip("'\"")
-            return cleaned
+            value = value.strip().strip("'\"")
+        # If value is empty string or None (e.g. empty Docker env var), fallback to config/.env if available
+        if (value is None or value == "") and info.field_name and _file_env:
+            fallback_val = _file_env.get(info.field_name)
+            if fallback_val is not None and fallback_val != "":
+                if isinstance(fallback_val, str):
+                    fallback_val = fallback_val.strip().strip("'\"")
+                return fallback_val
         return value
 
     # Instagram Graph API
@@ -101,6 +118,51 @@ class Settings(BaseSettings):
     @property
     def s3_or_r2_public_domain(self) -> Optional[str]:
         return self.R2_PUBLIC_DOMAIN or self.S3_PUBLIC_DOMAIN
+
+    def validate_storage_config(self) -> List[str]:
+        """
+        Validates only the variables relevant to the active STORAGE_TYPE.
+        Returns a list of missing configuration variable names.
+        """
+        st = self.STORAGE_TYPE.lower().strip()
+        missing = []
+        if st == "r2":
+            if not self.R2_ACCOUNT_ID:
+                missing.append("R2_ACCOUNT_ID")
+            if not self.R2_ACCESS_KEY_ID:
+                missing.append("R2_ACCESS_KEY_ID")
+            if not self.R2_SECRET_ACCESS_KEY:
+                missing.append("R2_SECRET_ACCESS_KEY")
+            if not self.R2_BUCKET_NAME:
+                missing.append("R2_BUCKET_NAME")
+            if not self.R2_PUBLIC_DOMAIN:
+                missing.append("R2_PUBLIC_DOMAIN")
+        elif st == "s3":
+            if not self.S3_ACCESS_KEY_ID:
+                missing.append("S3_ACCESS_KEY_ID")
+            if not self.S3_SECRET_ACCESS_KEY:
+                missing.append("S3_SECRET_ACCESS_KEY")
+            if not self.S3_BUCKET_NAME:
+                missing.append("S3_BUCKET_NAME")
+        elif st == "local":
+            if not self.LOCAL_PUBLIC_BASE_URL:
+                missing.append("LOCAL_PUBLIC_BASE_URL")
+        return missing
+
+    def validate_required_config(self) -> List[str]:
+        """
+        Validates all strictly required variables for the active configuration.
+        Returns a list of missing configuration variable names.
+        """
+        missing = []
+        if not self.BOT_TOKEN:
+            missing.append("BOT_TOKEN")
+        if not self.IG_USER_ID:
+            missing.append("IG_USER_ID")
+        if not self.IG_ACCESS_TOKEN:
+            missing.append("IG_ACCESS_TOKEN")
+        missing.extend(self.validate_storage_config())
+        return missing
 
 
 settings = Settings()

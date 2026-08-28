@@ -200,10 +200,10 @@ git clone <YOUR_REPOSITORY_URL> /opt/MemoryNMore
 cd /opt/MemoryNMore
 
 # Create .env from the template
-cp .env.example .env
-nano .env  # or vim .env
+cp config/.env.example config/.env
+nano config/.env  # or vim config/.env
 ```
-Fill in the parameters in `.env` (Telegram token, Instagram ID/Token, Gemini API Key, Cloudflare R2 or Local settings).
+Fill in the parameters in `config/.env` (Telegram token, Instagram ID/Token, Gemini API Key, Cloudflare R2 or Local settings).
 
 #### Way 2: Directly in `docker-compose.yml` or Shell Environment
 The `docker-compose.yml` file includes a full `environment:` block with fallback interpolation (`${VAR:-default}`). You can:

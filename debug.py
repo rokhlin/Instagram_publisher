@@ -15,6 +15,12 @@ import asyncio
 import logging
 from typing import Dict, Any, Tuple
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -94,28 +100,21 @@ async def test_config() -> Tuple[bool, str]:
         print(f"  • LOCAL_SERVER_ENABLED:     {settings.LOCAL_SERVER_ENABLED}")
         print(f"  • LOCAL_SERVER_PORT:        {settings.LOCAL_SERVER_PORT}")
 
-    # Validation
-    errors = []
-    if not settings.BOT_TOKEN:
-        errors.append("BOT_TOKEN is missing")
-    if not settings.IG_USER_ID:
-        errors.append("IG_USER_ID is missing")
-    if not settings.IG_ACCESS_TOKEN:
-        errors.append("IG_ACCESS_TOKEN is missing")
-
-    if errors:
-        msg = f"Missing required variables: {', '.join(errors)}"
+    # Validation - only checks required common variables and active STORAGE_TYPE variables
+    missing_vars = settings.validate_required_config()
+    if missing_vars:
+        msg = f"Missing required variables for active mode ({settings.STORAGE_TYPE}): {', '.join(missing_vars)}"
         print_status("Config Validation", False, msg)
         return False, msg
 
-    print_status("Config Validation", True, "All primary environment variables are populated.")
+    print_status("Config Validation", True, f"All required environment variables for active mode ({settings.STORAGE_TYPE}) are populated.")
     return True, "OK"
 
 
 async def test_telegram_bot() -> Tuple[bool, str]:
     print_section("2. Telegram Bot API Connectivity")
     if not settings.BOT_TOKEN:
-        print_status("Telegram Bot", False, "BOT_TOKEN not configured in .env")
+        print_status("Telegram Bot", False, "BOT_TOKEN not configured in Docker environment or ./config/.env")
         return False, "BOT_TOKEN missing"
 
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getMe"
@@ -211,7 +210,7 @@ async def test_gemini_ai() -> Tuple[bool, str]:
         return True, "Fallback mode (No API Key)"
 
     try:
-        caption = await ai_service.generate_caption(user_topic="Debug test: beautiful sunrise in mountains", post_format="FEED")
+        caption = await ai_service.generate_caption(instructions="Debug test: beautiful sunrise in mountains", post_format="FEED_PORTRAIT")
         if caption and len(caption) > 20 and not caption.startswith("Rediscovering the world"):
             preview = caption.split("\n")[0][:60]
             print_status("Gemini AI", True, f"Caption generation active (Model: gemini-3.7-flash). Preview: '{preview}...'")

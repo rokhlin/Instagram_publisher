@@ -83,9 +83,9 @@ class StorageService:
         if self.storage_type == "local":
             if not settings.LOCAL_PUBLIC_BASE_URL:
                 raise ValueError(
-                    "LOCAL_PUBLIC_BASE_URL is not set in .env! "
+                    "LOCAL_PUBLIC_BASE_URL is not set! "
                     "Instagram Graph API requires a publicly accessible HTTPS URL. "
-                    "Example: LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com"
+                    "Please provide LOCAL_PUBLIC_BASE_URL via Docker environment variable or in ./config/.env (e.g. LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com)"
                 )
             
             public_base = settings.LOCAL_PUBLIC_BASE_URL.rstrip("/")
@@ -120,9 +120,16 @@ class StorageService:
                 logger.error(f"S3/R2 upload error: {e}")
                 raise RuntimeError(f"Failed to upload media to S3/R2: {e}")
 
-        raise ValueError(
-            f"STORAGE_TYPE is '{self.storage_type}', but S3/R2 credentials or bucket name are missing in .env."
-        )
+        if self.storage_type == "r2":
+            raise ValueError(
+                "STORAGE_TYPE is 'r2', but Cloudflare R2 credentials (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, "
+                "R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) are incomplete in Docker environment or ./config/.env."
+            )
+        else:
+            raise ValueError(
+                "STORAGE_TYPE is 's3', but S3 credentials (S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, "
+                "S3_BUCKET_NAME) are incomplete in Docker environment or ./config/.env."
+            )
 
     async def upload_image(self, image_bytes: bytes, filename: Optional[str] = None) -> str:
         """
