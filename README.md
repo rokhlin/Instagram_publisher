@@ -40,69 +40,86 @@ MemoryNMore/
 
 ---
 
-## 💾 Media Storage Options (`STORAGE_TYPE`)
+## 📋 Configuration Reference (Environment Variables)
 
-The Instagram Graph API requires a publicly accessible image URL (`image_url`) to ingest media onto Meta servers.
-
----
-
-### Mode 1: `STORAGE_TYPE=r2` (Cloudflare R2 — Recommended)
-Completely isolates your server, requires no open inbound ports, and is free (10 GB storage included, $0 egress fees).
-
-```env
-STORAGE_TYPE=r2
-
-# Credentials from Cloudflare Dashboard (R2 -> Manage R2 API Tokens)
-R2_ACCOUNT_ID=your_account_id_from_cloudflare_dashboard
-R2_ACCESS_KEY_ID=your_r2_access_key_id
-R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
-R2_BUCKET_NAME=instagram-media
-
-# Public bucket domain:
-# - Custom Domain: https://media.yourdomain.com
-# - or R2 dev domain: https://pub-xxxxxxxx.r2.dev
-R2_PUBLIC_DOMAIN=https://media.yourdomain.com
-```
+All variables can be supplied either via **`config/.env`** or directly as **Docker Compose / container environment variables**. Variables are validated conditionally based on the active `STORAGE_TYPE`, so you only need to configure parameters relevant to your setup.
 
 ---
 
-### Mode 2: `STORAGE_TYPE=local` (Secured Local Storage)
-Images are saved in `./data/media` and served by an embedded `aiohttp` web server with multi-layered security:
-
-```env
-STORAGE_TYPE=local
-LOCAL_STORAGE_DIR=/app/data/media
-LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com
-LOCAL_SERVER_ENABLED=true
-LOCAL_SERVER_PORT=3018
-```
-
-#### 🛡 Built-in Local Server Security Features:
-1. **Directory Traversal Protection:** Canonical path validation (`os.path.commonpath`), blocking `../` escape attempts outside the allowed directory.
-2. **Hidden File Access Prevention:** Blocks access to any dotfiles (`.gitkeep`, `.env`, `.gitignore`).
-3. **Extension Whitelisting:** Serves only allowed media file extensions (`.jpg`, `.jpeg`, `.png`, `.webp`, `.mp4`, `.mov`).
-4. **HTTP Method Restriction:** Only `GET` and `HEAD` requests are permitted. All other methods (`POST`, `PUT`, `DELETE`, etc.) return `405 Method Not Allowed`.
-5. **Security Headers:** Automatically sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Content-Security-Policy`.
-6. **Directory Listing Disabled:** Requests to directory paths or root return `404 Not Found`.
+### 1. Telegram Bot (Core)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `BOT_TOKEN` | **Yes** | — | Telegram Bot API token from [@BotFather](https://t.me/BotFather). |
+| `ALLOWED_USER_IDS` | *Optional* | `""` | Comma-separated list of allowed Telegram user IDs (e.g. `123456789,987654321`). Leave empty to allow any user. |
 
 ---
 
-### ⏱ Automatic Media Cleanup (Configurable TTL)
-Since Instagram fetches the image in seconds during publication, the bot includes a background cleanup service:
-
-```env
-# Enable/disable background cleanup (true/false)
-MEDIA_CLEANUP_ENABLED=true
-
-# Media time-to-live in minutes (e.g., 120 = 2 hours)
-MEDIA_TTL_MINUTES=120
-
-# Cleanup check interval (in minutes)
-MEDIA_CLEANUP_INTERVAL_MINUTES=30
-```
-The worker only purges expired generated media files while preserving system files such as `.gitkeep`.
+### 2. Instagram Graph API (Publishing)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `IG_USER_ID` | **Yes** | — | Instagram Business or Creator Account ID linked to your Meta App. |
+| `IG_ACCESS_TOKEN` | **Yes** | — | Long-lived Page Access Token or System User Token with publishing permissions. |
+| `IG_GRAPH_API_VERSION` | *Optional* | `v21.0` | Meta Graph API version to target. |
 
 ---
+
+### 3. Google Gemini AI (AI Content Generation)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `GEMINI_API_KEY` | *Optional* | `""` | Google AI Studio API key for generating captions, hooks, and hashtags (Gemini 3.7 Flash). If empty, built-in template captions are used. |
+
+---
+
+### 4. Storage Mode Selection
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `STORAGE_TYPE` | **Yes** | `r2` | Storage backend to store publicly accessible media files. Allowed values: `r2`, `s3`, or `local`. |
+
+---
+
+### 5. Cloudflare R2 Storage (Active when `STORAGE_TYPE=r2`)
+> [!TIP]
+> **Recommended**: Cloudflare R2 includes 10 GB free storage, zero egress bandwidth fees, and requires no open ports on your host.
+
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `R2_ACCOUNT_ID` | **Yes** | — | Cloudflare Account ID from the Cloudflare R2 dashboard. |
+| `R2_ACCESS_KEY_ID` | **Yes** | — | R2 API Token Access Key ID with Read & Write permissions. |
+| `R2_SECRET_ACCESS_KEY` | **Yes** | — | R2 API Token Secret Access Key. |
+| `R2_BUCKET_NAME` | **Yes** | `instagram-media` | Target R2 bucket name. |
+| `R2_PUBLIC_DOMAIN` | **Yes** | — | Public HTTPS URL for the bucket (e.g. `https://pub-xxxx.r2.dev` or custom subdomain `https://media.yourdomain.com`). |
+
+---
+
+### 6. Generic S3 / AWS S3 Storage (Active when `STORAGE_TYPE=s3`)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `S3_ENDPOINT_URL` | *Optional* | `""` | Custom S3 endpoint URL (e.g. `https://s3.eu-central-1.amazonaws.com` or MinIO `https://minio.yourdomain.com`). Leave empty for AWS default. |
+| `S3_ACCESS_KEY_ID` | **Yes** | — | AWS / S3 Access Key ID. |
+| `S3_SECRET_ACCESS_KEY` | **Yes** | — | AWS / S3 Secret Access Key. |
+| `S3_BUCKET_NAME` | **Yes** | `instagram-media` | S3 bucket name. |
+| `S3_PUBLIC_DOMAIN` | *Optional* | `""` | Public CDN / domain prefix for uploaded objects (e.g. `https://media.yourdomain.com`). |
+
+---
+
+### 7. Local Media Storage & Web Server (Active when `STORAGE_TYPE=local`)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `LOCAL_STORAGE_DIR` | *Optional* | `/app/data/media` | Directory inside container where local media is saved (mounted to `./data/media`). |
+| `LOCAL_PUBLIC_BASE_URL` | **Yes** | — | Public HTTPS base URL where Instagram API can download local media (e.g. `https://media.yourdomain.com`, Cloudflare Tunnel, or Ngrok). |
+| `LOCAL_SERVER_ENABLED` | *Optional* | `false` | Enable built-in secure static HTTP media server on the specified port. |
+| `LOCAL_SERVER_HOST` | *Optional* | `0.0.0.0` | Host/bind address for built-in media server. |
+| `LOCAL_SERVER_PORT` | *Optional* | `3018` | Port exposed by built-in media server (mapped in `docker-compose.yml`). |
+
+---
+
+### 8. Automatic Media Cleanup / TTL
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `MEDIA_CLEANUP_ENABLED` | *Optional* | `true` | Enable background worker that automatically deletes temporary local media files after expiration. |
+| `MEDIA_TTL_MINUTES` | *Optional* | `120` | Time-to-Live (TTL) in minutes before generated media files are deleted (120 = 2 hours). |
+| `MEDIA_CLEANUP_INTERVAL_MINUTES` | *Optional* | `30` | Frequency (in minutes) of background cleanup scans. |
+
 
 ## 📖 Step-by-Step Guide: Setting Up Cloudflare R2
 
@@ -124,14 +141,14 @@ Meta's Instagram servers require a public URL to download the media. Choose one 
   2. Scroll down to the **Public Development Domain** section.
   3. Click **Enable** and confirm by typing `allow`.
   4. Copy the generated URL (format: `https://pub-xxxxxxxxxxxxxxxxxxxxxxxx.r2.dev`).
-  5. Set this value as `R2_PUBLIC_DOMAIN` in your `.env`.
+  5. Set this value as `R2_PUBLIC_DOMAIN` in `config/.env` or Docker Compose.
 
 * **Option B — Production (Custom Subdomain, e.g., `media.yourdomain.com`):**
   1. Inside the bucket, go to the **Settings** tab.
   2. In the **Custom Domains** section, click **Connect Domain**.
   3. Enter your desired subdomain (e.g., `media.yourdomain.com`).
   4. Cloudflare will automatically configure DNS records and issue an SSL certificate.
-  5. Set `https://media.yourdomain.com` as `R2_PUBLIC_DOMAIN` in your `.env`.
+  5. Set `https://media.yourdomain.com` as `R2_PUBLIC_DOMAIN` in `config/.env` or Docker Compose.
 
 ### Step 3: Generate API Tokens (Access Key & Secret Key)
 1. Return to the main **R2** overview page in Cloudflare.
@@ -145,8 +162,8 @@ Meta's Instagram servers require a public URL to download the media. Choose one 
    * **TTL:** Select *Forever* (or your desired expiration duration).
 6. Click **Create API Token**.
 7. Copy the generated credentials:
-   * **Access Key ID** ➔ `R2_ACCESS_KEY_ID` in `.env`.
-   * **Secret Access Key** ➔ `R2_SECRET_ACCESS_KEY` in `.env`.
+   * **Access Key ID** ➔ `R2_ACCESS_KEY_ID` in `config/.env` or Docker Compose.
+   * **Secret Access Key** ➔ `R2_SECRET_ACCESS_KEY` in `config/.env` or Docker Compose.
 
 ---
 
@@ -170,6 +187,30 @@ Meta's Instagram servers require a public URL to download the media. Choose one 
 ### 3. Google Gemini API (Optional)
 1. Get a free API key from [Google AI Studio](https://aistudio.google.com/).
 2. Set it in `GEMINI_API_KEY` for automated caption, question, and hashtag generation.
+
+### 4. Cloudflare Tunnel Setup (When using `STORAGE_TYPE=local`)
+
+#### Why a Public Tunnel is Required:
+When running in `STORAGE_TYPE=local` on a home server, NAS (ZimaOS, Synology, Unraid, CasaOS), or private network behind NAT/firewall:
+- The local media server (port `3018`) is private and unreachable from the internet.
+- The Meta Instagram Graph API requires a publicly reachable HTTPS URL with valid SSL to fetch the media during publishing.
+- A **Cloudflare Tunnel** (or Ngrok / Reverse Proxy) provides an encrypted outbound connection that exposes your local port `3018` to a public domain (e.g., `https://media.yourdomain.com`) without opening router ports or exposing a public IP.
+
+#### Connecting an Existing Cloudflare Tunnel:
+1. In the [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) ➔ **Networks** ➔ **Tunnels**, select your tunnel.
+2. Go to **Public Hostnames** ➔ **Add a public hostname**.
+3. Configure the route:
+   * **Public Hostname:** `media.yourdomain.com` (or your subdomain)
+   * **Service Type:** `HTTP`
+   * **URL:** `localhost:3018` *(or host LAN IP `192.168.x.x:3018` / container hostname)*
+4. Save the hostname.
+5. In `config/.env` or Docker Compose, set:
+   ```env
+   STORAGE_TYPE=local
+   LOCAL_SERVER_ENABLED=true
+   LOCAL_SERVER_PORT=3018
+   LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com
+   ```
 
 ---
 
@@ -216,19 +257,11 @@ The `docker-compose.yml` file includes a full `environment:` block with fallback
 
 ---
 
-### Step 3: Run Containers
+### Step 3: Run Container
 
-#### Option A: Standard Run (Recommended with `STORAGE_TYPE=r2`)
+Start the bot container in detached mode:
 ```bash
 docker compose up -d --build
-```
-
-#### Option B: Run with Cloudflare Tunnel (for `STORAGE_TYPE=local`)
-If you use local media serving and want secure public HTTPS without opening firewall ports:
-1. Provide your tunnel token in `.env`: `CLOUDFLARE_TUNNEL_TOKEN=your_token`
-2. Start using the `tunnel` profile:
-```bash
-docker compose --profile tunnel up -d --build
 ```
 
 ---
