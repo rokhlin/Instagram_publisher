@@ -1,0 +1,33 @@
+{
+  "common": {
+    "cancel": "❌ Cancel",
+    "back": "⬅️ Back",
+    "skip": "⏩ Skip",
+    "done": "✅ Done",
+    "save": "💾 Save",
+    "loading": "⏳ Processing...",
+    "error_occurred": "⚠️ An error occurred. Please try again."
+  },
+  "whatsapp": {
+    "help_text": "🌟 *Instagram Auto-Posting Bot Guide*\n\nThis bot helps you prepare photos, videos, and carousels, generate AI captions via Google Gemini / Local LLM, apply stylish filters, overlay custom fonts, configure tags (#) and mentions (@), and publish directly to Instagram!\n\n📸 *Supported Features:*\n• *Photos, videos, and albums* (Stories, Feed, Reels, Carousels).\n• 🎨 *7 aesthetic filters*: Golden Hour, Vintage, Cinema, B&W Noir, Vibrant, Soft Glow.\n• 🔤 *5 decorative fonts*: Modern Sans, Handwriting, Elegant Serif, Retro Rounded, Accent Bold.\n• 🤖 *AI Copywriter*: generate engaging captions with hashtags.\n\n🚀 *How to create a post:*\n1️⃣ Send a photo or video 📎.\n2️⃣ Provide a topic/notes (or send *\"done\"* for auto-generation).\n3️⃣ Review the post and confirm publication!\n\n📋 *Commands:*\n• *ping* — test connection (reply: pong)\n• */status* — connection & server status\n• */help* — help guide\n• */tags* — preset hashtags\n• */mentions* — constant mentions\n• */cancel* — cancel current operation",
+    "ping_pong": "🏓 *Pong!* Bot is online and ready.",
+    "status_header": "📊 *System & Connection Status*",
+    "status_account": "• *Instagram Account ID:* `{account_id}`",
+    "status_storage": "• *Storage:* `{storage_type}` {storage_url}",
+    "status_ai": "• *AI Copywriter:* `{ai_status}`",
+    "status_bot": "• *WhatsApp Bot:* `Online & Operational` ✅",
+    "status_user": "• *Connected Account:* `{user_name}` (+{user_phone})",
+    "status_session": "• *Session:* `LocalAuth (Saved)` ✅",
+    "status_backend": "• *Core Backend API:* `{backend_status}`",
+    "status_footer": "Send a photo, video, or message with a topic to prepare a new post.",
+    "tags_info": "🏷️ *Preset Hashtags (#):*\n\n• #family #lifestyle #memories #nature #moments #happiness #photooftheday\n• #travel #wanderlust\n\n💡 _Tags are automatically appended to generated captions._",
+    "mentions_info": "👥 *Constant Mentions (@):*\n\n• Mentions are used to tag co-authors or family accounts in Instagram.\n• Configure the permanent list via the */mentions* command in Telegram bot.",
+    "action_cancelled": "🔄 *Action cancelled.* Send a photo or video to create a new post.",
+    "media_received_with_caption": "📸 *Media received!* ({file_size_kb} KB)\nGenerating AI caption for topic: _\"{topic}\"_... ⏳",
+    "media_received_prompt_needed": "📸 *Media successfully received!* ({file_size_kb} KB)\n\n✍️ *Send your topic/instructions* or send *\"done\"* to auto-generate an AI caption.",
+    "media_error": "⚠️ Failed to process media file. Please try again.",
+    "generating_caption": "✨ Generating caption for topic: _\"{topic}\"_... ⏳",
+    "generated_caption_header": "✨ *Ready Instagram Caption:*\n\n{caption}\n\n------------------------------------\n📸 _To publish this post, send a photo or use the Telegram bot @memory_n_more_bot._",
+    "fallback_caption": "✨ *New day — new memories!* 🌿\n\n{topic_text}Cherishing the warmest moments that remain in our hearts forever. Every frame is a little story filled with warmth and inspiration. ✨\n\nWhat were your favorite moments this week? Share in the comments! 👇\n\n#family #memories #travel #moments #photooftheday #inspiration #lifestyle #wanderlust"
+  }
+}

@@ -6,6 +6,7 @@
 
 import axios from 'axios';
 import { PYTHON_BACKEND_URL } from './config';
+import { t } from './i18n';
 
 export interface BackendStatus {
     success: boolean;
@@ -57,15 +58,9 @@ export async function generateCaption(
         }
     }
 
-    // 2. Local fallback if Python backend is temporarily unreachable
-    return (
-        `✨ *Новый день — новые воспоминания!* 🌿\n\n` +
-        `${instructions ? `Тема: ${instructions}\n\n` : ''}` +
-        `Сохраняем самые яркие и душевные моменты, которые остаются в сердце навсегда. ` +
-        `Каждый кадр — это маленькая история, наполненная теплом и вдохновением. ✨\n\n` +
-        `А какие моменты этой недели запомнились вам больше всего? Делитесь в комментариях! 👇\n\n` +
-        `#семья #воспоминания #уют #моменты #фотодня #вдохновение #счастье #family #memories #lifestyle`
-    );
+    // 2. Local fallback from i18n
+    const topicText = instructions ? (language.startsWith('ru') ? `Тема: ${instructions}\n\n` : `Topic: ${instructions}\n\n`) : '';
+    return t('whatsapp.fallback_caption', { topic_text: topicText }, language);
 }
 
 export async function refineCaption(

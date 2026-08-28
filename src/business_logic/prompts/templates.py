@@ -91,27 +91,19 @@ def build_transcription_prompt() -> str:
     )
 
 
+from src.business_logic.i18n import t
+
+
 def get_fallback_caption(
     instructions: str = "",
     post_format: str = "FEED_PORTRAIT",
     language: str = "ru"
 ) -> str:
     """Provides fallback caption when AI generation is unavailable."""
-    if language.lower().startswith("ru"):
-        topic_text = f"Тема: {instructions}\n\n" if instructions else ""
-        return (
-            f"Создаем моменты, которые остаются в сердце навсегда ✨🌿\n\n"
-            f"{topic_text}"
-            f"Каждый день дарит нам особенные поводы для улыбки и вдохновения.\n\n"
-            f"📍 Вопрос дня: Как проходит ваша неделя?\n\n"
-            f"#семья #путешествия #уют #моменты #вдохновение #жизнь #воспоминания"
-        )
+    is_ru = language.lower().startswith("ru")
+    if instructions:
+        topic_text = f"Тема: {instructions}\n\n" if is_ru else f"Topic: {instructions}\n\n"
     else:
-        topic_text = f"Topic: {instructions}\n\n" if instructions else ""
-        return (
-            f"Rediscovering the world together ✨🌍\n\n"
-            f"{topic_text}"
-            f"Every single day brings new moments that are truly worth keeping in our hearts forever.\n\n"
-            f"📍 Question of the day: How are you spending your week?\n\n"
-            f"#family #travel #nature #moments #lifestyle #wanderlust #memories #inspiration"
-        )
+        topic_text = ""
+    return t("prompts.fallback_caption", lang=language, topic_text=topic_text)
+

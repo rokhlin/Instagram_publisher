@@ -6,7 +6,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
 from src.config import settings
-from src.communication.telegram import create_telegram_bot_and_dispatcher
+from src.communication.telegram import (
+    create_telegram_bot_and_dispatcher,
+    setup_bot_commands,
+)
 from src.communication.api_server import start_communication_api_server
 from src.business_logic.storage import run_cleanup_worker
 
@@ -48,6 +51,7 @@ async def main():
         try:
             # Delete existing webhooks if any and start polling
             await bot.delete_webhook(drop_pending_updates=True)
+            await setup_bot_commands(bot)
             logger.info("Telegram Bot is ready and listening for incoming messages...")
             await dp.start_polling(bot)
         finally:

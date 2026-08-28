@@ -31,6 +31,7 @@ from src.business_logic.storage import (
     secure_media_handler,
     run_cleanup_worker,
 )
+from src.business_logic.i18n import t, get_text
 
 __all__ = [
     "ContentOrchestrator",
@@ -61,4 +62,6 @@ __all__ = [
     "start_secure_media_server",
     "secure_media_handler",
     "run_cleanup_worker",
+    "t",
+    "get_text",
 ]

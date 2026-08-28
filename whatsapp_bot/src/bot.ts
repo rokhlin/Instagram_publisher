@@ -29,6 +29,7 @@ import {
 } from './config';
 import { generateCaption, getBackendStatus } from './backendClient';
 import { ClientStatus, UserMediaSession, SendMessagePayload, SendMediaPayload } from './types';
+import { t } from './i18n';
 
 // Clean stale Chromium locks before initialization
 cleanStaleSingletonLocks(AUTH_DIR);
@@ -44,30 +45,8 @@ const botSentMessageIds: Set<string> = new Set();
 const userMediaState: Map<string, UserMediaSession> = new Map();
 
 // ============================================================================
-// Text Templates (Matching Telegram Bot Experience)
+// Status & Diagnostics
 // ============================================================================
-const HELP_TEXT = (
-    `🌟 *Instagram Auto-Posting Bot Guide*\n\n` +
-    `Этот бот помогает подготавливать фото, видео и альбомы (карусели), создавать AI-описания с помощью Google Gemini, ` +
-    `накладывать дизайнерские шрифты, применять стильные фильтры, настраивать теги (#) и упоминания (@), и публиковать всё в Instagram!\n\n` +
-    `📸 *Поддерживаемые возможности:*\n` +
-    `• *Фото, видео и альбомы* (Stories, Feed, Reels, Carousels).\n` +
-    `• 🎨 *7 эстетичных фильтров*: Золотой час, Винтаж, Кинематограф, Ч/Б Нуар, Сочный, Мягкий свет.\n` +
-    `• 🔤 *5 декоративных шрифтов*: Modern Sans, Рукописный, Элегантный Serif, Ретро Rounded, Акцентный Bold.\n` +
-    `• 🤖 *AI-копирайтер*: генерация продающих и душевных описаний с хештегами.\n\n` +
-    `🚀 *Как создать публикацию:*\n` +
-    `1️⃣ Отправьте фото или видео 📎.\n` +
-    `2️⃣ Напишите тему или пожелания к описанию (или отправьте *«готово»* для авто-генерации).\n` +
-    `3️⃣ Получите готовый пост и подтвердите публикацию!\n\n` +
-    `📋 *Команды:*\n` +
-    `• *ping* — проверка связи (ответ: pong)\n` +
-    `• */status* — статус подключений и серверов\n` +
-    `• */help* — справка и руководство\n` +
-    `• */tags* — список предустановленных тегов\n` +
-    `• */mentions* — список постоянных упоминаний\n` +
-    `• */cancel* — отменить текущую операцию`
-);
-
 function getStatusMessage(): string {
     const aiStatus = GEMINI_API_KEY ? 'Google Gemini AI Active' : 'Шаблоны (Ключ не задан)';
     let storageUrl = '';
@@ -75,16 +54,20 @@ function getStatusMessage(): string {
     else if (STORAGE_TYPE === 'S3') storageUrl = S3_PUBLIC_DOMAIN;
     else storageUrl = LOCAL_PUBLIC_BASE_URL;
 
-    return (
-        `📊 *Статус системы и подключений*\n\n` +
-        `• *Instagram Account ID:* \`${IG_USER_ID || 'Не задан'}\`\n` +
-        `• *Хранилище:* \`${STORAGE_TYPE}\` ${storageUrl ? `(${storageUrl})` : ''}\n` +
-        `• *AI Копирайтер:* \`${aiStatus}\`\n` +
-        `• *WhatsApp Бот:* \`Онлайн и готов к работе\` ✅\n` +
-        `• *Подключенный аккаунт:* \`${clientInfo?.pushname || 'User'}\` (+${clientInfo?.wid?.user || 'N/A'})\n` +
-        `• *Сессия:* \`LocalAuth (Сохранена)\` ✅\n\n` +
-        `Отправьте фото, видео или сообщение с темой для подготовки новой публикации.`
-    );
+    const lines = [
+        t('whatsapp.status_header'),
+        '',
+        t('whatsapp.status_account', { account_id: IG_USER_ID || 'Не задан' }),
+        t('whatsapp.status_storage', { storage_type: STORAGE_TYPE, storage_url: storageUrl ? `(${storageUrl})` : '' }),
+        t('whatsapp.status_ai', { ai_status: aiStatus }),
+        t('whatsapp.status_bot'),
+        t('whatsapp.status_user', { user_name: clientInfo?.pushname || 'User', user_phone: clientInfo?.wid?.user || 'N/A' }),
+        t('whatsapp.status_session'),
+        '',
+        t('whatsapp.status_footer')
+    ];
+
+    return lines.join('\n');
 }
 
 // ============================================================================
@@ -287,13 +270,13 @@ client.on('message_create', async (msg: Message) => {
 
     // 1. Ping Command
     if (['ping', 'пинг'].includes(lowerBody)) {
-        await sendBotResponse(msg, '🏓 *Pong!* Бот на связи и готов к работе.');
+        await sendBotResponse(msg, t('whatsapp.ping_pong'));
         return;
     }
 
     // 2. Start / Help Commands
     if (['/start', '/help', 'help', 'помощь', 'меню', 'привет', 'hi', 'hello', 'start'].includes(lowerBody)) {
-        await sendBotResponse(msg, HELP_TEXT);
+        await sendBotResponse(msg, t('whatsapp.help_text'));
         return;
     }
 
@@ -305,29 +288,20 @@ client.on('message_create', async (msg: Message) => {
 
     // 4. Tags Command
     if (['/tags', 'tags', 'теги', 'хештеги'].includes(lowerBody)) {
-        const tagsMsg =
-            `🏷️ *Предустановленные хештеги (#):*\n\n` +
-            `• #семья #семейныйблог #воспоминания #уют #моменты #дети #любовь #счастье #фотодня\n` +
-            `• #travel #family #memories #nature #lifestyle\n\n` +
-            `💡 _Теги автоматически прикрепляются к сгенерированным постам._`;
-        await sendBotResponse(msg, tagsMsg);
+        await sendBotResponse(msg, t('whatsapp.tags_info'));
         return;
     }
 
     // 5. Mentions Command
     if (['/mentions', 'mentions', 'упоминания'].includes(lowerBody)) {
-        const mentionsMsg =
-            `👥 *Постоянные упоминания (@):*\n\n` +
-            `• Упоминания используются для отметки соавторов или семейных аккаунтов в Instagram.\n` +
-            `• Настроить постоянный список можно через команду */mentions* в Telegram-боте.`;
-        await sendBotResponse(msg, mentionsMsg);
+        await sendBotResponse(msg, t('whatsapp.mentions_info'));
         return;
     }
 
     // 6. Cancel Command
     if (['/cancel', 'cancel', 'отмена', 'стоп'].includes(lowerBody)) {
         userMediaState.delete(senderNumber);
-        await sendBotResponse(msg, '🔄 *Действие отменено.* Отправьте фото или видео для создания новой публикации.');
+        await sendBotResponse(msg, t('whatsapp.action_cancelled'));
         return;
     }
 
@@ -363,29 +337,24 @@ client.on('message_create', async (msg: Message) => {
                 if (body && body.length > 0) {
                     await sendBotResponse(
                         msg,
-                        `📸 *Медиафайл получен!* (${fileSizeKb} KB)\n` +
-                        `Генерирую AI-описание по вашей теме: _«${body}»_... ⏳`
+                        t('whatsapp.media_received_with_caption', { file_size_kb: fileSizeKb, topic: body })
                     );
                     const aiCaption = await generateCaption(body, media.data, media.mimetype);
                     await sendBotResponse(
                         msg,
-                        `✨ *Сгенерированное AI-описание для Instagram:*\n\n` +
-                        `${aiCaption}\n\n` +
-                        `------------------------------------\n` +
-                        `💡 _Медиа сохранено в кэше._`
+                        `✨ *${t('common.done')}:*\n\n${aiCaption}\n\n------------------------------------\n💡 _Медиа сохранено в кэше._`
                     );
                 } else {
                     await sendBotResponse(
                         msg,
-                        `📸 *Медиафайл успешно получен!* (${fileSizeKb} KB)\n\n` +
-                        `✍️ *Напишите тему/пожелания к описанию* или отправьте *«готово»* для автоматической генерации AI-описания через Google Gemini.`
+                        t('whatsapp.media_received_prompt_needed', { file_size_kb: fileSizeKb })
                     );
                 }
                 return;
             }
         } catch (mediaErr: any) {
             console.error('[Media Error] Failed to process media:', mediaErr.message);
-            await sendBotResponse(msg, '⚠️ Не удалось загрузить медиафайл. Пожалуйста, попробуйте еще раз.');
+            await sendBotResponse(msg, t('whatsapp.media_error'));
             return;
         }
     }
@@ -397,7 +366,7 @@ client.on('message_create', async (msg: Message) => {
         const userState = userMediaState.get(senderNumber);
         const hasRecentMedia = userState && (Date.now() - userState.timestamp < 1000 * 60 * 60); // 1 hour TTL
 
-        await sendBotResponse(msg, `✨ Генерирую пост по теме: _«${body}»_... ⏳`);
+        await sendBotResponse(msg, t('whatsapp.generating_caption', { topic: body }));
 
         const imageBase64 = hasRecentMedia ? userState.base64 : null;
         const mimeType = hasRecentMedia ? userState.mimetype : 'image/jpeg';
@@ -405,10 +374,7 @@ client.on('message_create', async (msg: Message) => {
 
         await sendBotResponse(
             msg,
-            `✨ *Готовое описание для Instagram:*\n\n` +
-            `${aiCaption}\n\n` +
-            `------------------------------------\n` +
-            `📸 _Чтобы опубликовать этот пост, отправьте фото или воспользуйтесь Telegram-ботом @memory_n_more_bot._`
+            t('whatsapp.generated_caption_header', { caption: aiCaption })
         );
     }
 });

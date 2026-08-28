@@ -1,0 +1,96 @@
+{
+  "common": {
+    "cancel": "❌ Cancel",
+    "back": "⬅️ Back",
+    "skip": "⏩ Skip",
+    "skip_auto": "⏩ Skip (Auto Analysis)",
+    "done": "✅ Done",
+    "save": "💾 Save",
+    "edit": "✏️ Edit",
+    "publish": "🚀 Publish to Instagram",
+    "published": "✅ Successfully published to Instagram!",
+    "loading": "⏳ Processing...",
+    "error_occurred": "⚠️ An error occurred. Please try again.",
+    "access_denied": "⛔ Access denied.",
+    "action_cancelled": "🔄 Action cancelled."
+  },
+  "formats": {
+    "STORY": "📱 Stories (9:16)",
+    "FEED_PORTRAIT": "🖼 Feed (4:5)",
+    "FEED_SQUARE": "⏹ Feed (1:1)",
+    "CAROUSEL_PORTRAIT": "🎠 Carousel (4:5)",
+    "CAROUSEL_SQUARE": "⏹ Carousel (1:1)",
+    "REELS": "🎬 Reels (9:16)"
+  },
+  "keyboards": {
+    "tags": "🏷 Tags ({count})",
+    "mentions": "👥 Mentions ({count})",
+    "edit_caption": "🎙✏️ Refine Caption",
+    "regenerate": "🔄 Regenerate",
+    "filters": "🎨 Filters",
+    "fonts": "🔤 Font",
+    "photo_text_on": "✍️ Text on Photo: ✅ ON",
+    "photo_text_off": "✍️ Text on Photo: ❌ OFF",
+    "edit_photo_text": "✏️ Edit Photo Text",
+    "add_photo_text": "✍️ Add Text on Photo",
+    "add_custom_tag": "➕ Add Custom Tag",
+    "manage_preset_tags": "⚙️ Preset Tags",
+    "add_custom_mention": "➕ Add Account",
+    "manage_preset_mentions": "⚙️ Preset Mentions",
+    "add_preset_tag": "➕ Add Tag",
+    "add_preset_mention": "➕ Add Mention",
+    "save_and_return": "💾 Save & Return",
+    "back_to_preview": "🔙 Back to Preview",
+    "back": "🔙 Back"
+  },
+  "commands": {
+    "start": "Restart and help guide",
+    "help": "Help guide and features",
+    "tags": "Manage preset hashtags (#)",
+    "mentions": "Manage constant mentions (@)",
+    "status": "System & connection status",
+    "cancel": "Cancel current operation"
+  },
+  "filters": {
+    "none": "No filter",
+    "golden_hour": "🌅 Golden Hour",
+    "vintage": "🎞 Vintage",
+    "cinema": "🎬 Cinema",
+    "bw_noir": "🖤 B&W Noir",
+    "vibrant": "🌺 Vibrant",
+    "soft_glow": "✨ Soft Glow"
+  },
+  "fonts": {
+    "modern_sans": "Modern Sans (Minimal)",
+    "handwriting": "Handwriting (Delicate)",
+    "elegant_serif": "Elegant Serif (Premium)",
+    "retro_rounded": "Retro Rounded (Cozy)",
+    "accent_bold": "Accent Bold (Dynamic)"
+  },
+  "prompts": {
+    "fallback_caption": "✨ Making memories that stay in our hearts forever 🌿\n\n{topic_text}Every day brings unique moments for smiles and inspiration.\n\n📍 Question of the day: How is your week going? Share in the comments! 👇\n\n#family #memories #travel #moments #photooftheday #inspiration #lifestyle #wanderlust",
+    "fallback_story_overlay": "Making memories ✨",
+    "default_instructions": "Create a warm, engaging post for a personal blog"
+  },
+  "whatsapp": {
+    "help_text": "🌟 *Instagram Auto-Posting Bot Guide*\n\nThis bot helps you prepare photos, videos, and carousels, generate AI captions via Google Gemini / Local LLM, apply stylish filters, overlay custom fonts, configure tags (#) and mentions (@), and publish directly to Instagram!\n\n📸 *Supported Features:*\n• *Photos, videos, and albums* (Stories, Feed, Reels, Carousels).\n• 🎨 *7 aesthetic filters*: Golden Hour, Vintage, Cinema, B&W Noir, Vibrant, Soft Glow.\n• 🔤 *5 decorative fonts*: Modern Sans, Handwriting, Elegant Serif, Retro Rounded, Accent Bold.\n• 🤖 *AI Copywriter*: generate engaging captions with hashtags.\n\n🚀 *How to create a post:*\n1️⃣ Send a photo or video 📎.\n2️⃣ Provide a topic/notes (or send *\"done\"* for auto-generation).\n3️⃣ Review the post and confirm publication!\n\n📋 *Commands:*\n• *ping* — test connection (reply: pong)\n• */status* — connection & server status\n• */help* — help guide\n• */tags* — preset hashtags\n• */mentions* — constant mentions\n• */cancel* — cancel current operation",
+    "ping_pong": "🏓 *Pong!* Bot is online and ready.",
+    "status_header": "📊 *System & Connection Status*",
+    "status_account": "• *Instagram Account ID:* `{account_id}`",
+    "status_storage": "• *Storage:* `{storage_type}` {storage_url}",
+    "status_ai": "• *AI Copywriter:* `{ai_status}`",
+    "status_bot": "• *WhatsApp Bot:* `Online & Operational` ✅",
+    "status_user": "• *Connected Account:* `{user_name}` (+{user_phone})",
+    "status_session": "• *Session:* `LocalAuth (Saved)` ✅",
+    "status_footer": "Send a photo, video, or message with a topic to prepare a new post.",
+    "tags_info": "🏷️ *Preset Hashtags (#):*\n\n• #family #lifestyle #memories #nature #moments #happiness #photooftheday\n• #travel #wanderlust\n\n💡 _Tags are automatically appended to generated captions._",
+    "mentions_info": "👥 *Constant Mentions (@):*\n\n• Mentions are used to tag co-authors or family accounts in Instagram.\n• Configure the permanent list via the */mentions* command in Telegram bot.",
+    "action_cancelled": "🔄 *Action cancelled.* Send a photo or video to create a new post.",
+    "media_received_with_caption": "📸 *Media received!* ({file_size_kb} KB)\nGenerating AI caption for topic: _\"{topic}\"_... ⏳",
+    "media_received_prompt_needed": "📸 *Media successfully received!* ({file_size_kb} KB)\n\n✍️ *Send your topic/instructions* or send *\"done\"* to auto-generate an AI caption.",
+    "media_error": "⚠️ Failed to process media file. Please try again.",
+    "generating_caption": "✨ Generating caption for topic: _\"{topic}\"_... ⏳",
+    "generated_caption_header": "✨ *Ready Instagram Caption:*\n\n{caption}\n\n------------------------------------\n📸 _To publish this post, send a photo or use the Telegram bot._",
+    "access_denied_warning": "⛔ Number {sender_number} is not in the allowed numbers whitelist."
+  }
+}

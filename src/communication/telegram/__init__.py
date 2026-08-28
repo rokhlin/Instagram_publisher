@@ -2,7 +2,10 @@
 Telegram communication subpackage.
 """
 
-from src.communication.telegram.bot import create_telegram_bot_and_dispatcher
+from src.communication.telegram.bot import (
+    create_telegram_bot_and_dispatcher,
+    setup_bot_commands,
+)
 from src.communication.telegram.handlers import router as telegram_router
 from src.communication.telegram.states import PostCreationStates
 from src.communication.telegram.keyboards import (
@@ -20,6 +23,7 @@ from src.communication.telegram.keyboards import (
 
 __all__ = [
     "create_telegram_bot_and_dispatcher",
+    "setup_bot_commands",
     "telegram_router",
     "PostCreationStates",
     "get_language_keyboard",
