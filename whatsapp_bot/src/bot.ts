@@ -1,87 +1,46 @@
 /**
- * MemoryNMore WhatsApp Chatbot Connector
+ * MemoryNMore WhatsApp Chatbot Connector (TypeScript)
  * Powered by whatsapp-web.js, LocalAuth, Express & Google Gemini AI
  */
 
-const path = require('path');
-const fs = require('fs');
-require('dotenv').config({ path: path.resolve(__dirname, '../config/.env') });
-require('dotenv').config(); // Fallback to local .env if present
+import path from 'path';
+import fs from 'fs';
+import { Client, LocalAuth, MessageMedia, Message } from 'whatsapp-web.js';
+import qrcodeTerminal from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import express, { Request, Response } from 'express';
+import cors from 'cors';
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcodeTerminal = require('qrcode-terminal');
-const QRCode = require('qrcode');
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
+import {
+    PORT,
+    HOST,
+    AUTH_DIR,
+    MEDIA_DIR,
+    ALLOWED_NUMBERS,
+    IG_USER_ID,
+    STORAGE_TYPE,
+    GEMINI_API_KEY,
+    R2_PUBLIC_DOMAIN,
+    S3_PUBLIC_DOMAIN,
+    LOCAL_PUBLIC_BASE_URL,
+    PUPPETEER_EXECUTABLE_PATH,
+    cleanStaleSingletonLocks
+} from './config';
+import { generateGeminiCaption } from './gemini';
+import { ClientStatus, UserMediaSession, SendMessagePayload, SendMediaPayload } from './types';
 
-// ============================================================================
-// Configuration & State
-// ============================================================================
-const PORT = parseInt(process.env.WHATSAPP_PORT || process.env.PORT || '3019', 10);
-const HOST = process.env.WHATSAPP_HOST || '0.0.0.0';
-
-// Storage directories
-const DEFAULT_AUTH_DIR = path.resolve(__dirname, '../data/whatsapp_auth');
-const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || DEFAULT_AUTH_DIR;
-
-const DEFAULT_MEDIA_DIR = path.resolve(__dirname, '../data/media');
-const MEDIA_DIR = process.env.LOCAL_STORAGE_DIR || DEFAULT_MEDIA_DIR;
-
-// Allowed WhatsApp numbers (format: comma-separated international numbers without +, e.g. 79991234567,12025550123)
-const ALLOWED_NUMBERS = (process.env.WHATSAPP_ALLOWED_NUMBERS || '')
-    .split(',')
-    .map(n => n.trim().replace(/[^0-9]/g, ''))
-    .filter(Boolean);
-
-// App & Service configs
-const IG_USER_ID = process.env.IG_USER_ID || '';
-const STORAGE_TYPE = (process.env.STORAGE_TYPE || 'r2').toUpperCase();
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || '';
-const S3_PUBLIC_DOMAIN = process.env.S3_PUBLIC_DOMAIN || '';
-const LOCAL_PUBLIC_BASE_URL = process.env.LOCAL_PUBLIC_BASE_URL || '';
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || '';
-const PUPPETEER_EXECUTABLE_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
-
-let latestQrCode = null;
-let latestQrDataUrl = null;
-let clientStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, AUTHENTICATED, READY, DISCONNECTED
-let clientInfo = null;
-
-// Track bot-generated message IDs to prevent self-trigger loops
-const botSentMessageIds = new Set();
-// User conversation state buffer (stores last uploaded media per user)
-const userMediaState = new Map();
-
-// Ensure required directories exist
-if (!fs.existsSync(AUTH_DIR)) {
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
-}
-if (!fs.existsSync(MEDIA_DIR)) {
-    fs.mkdirSync(MEDIA_DIR, { recursive: true });
-}
-
-// Remove stale Chromium SingletonLock files left by container recreations/restarts
-function cleanStaleSingletonLocks(dir) {
-    try {
-        if (!fs.existsSync(dir)) return;
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                cleanStaleSingletonLocks(fullPath);
-            } else if (entry.name.startsWith('SingletonLock') || entry.name.startsWith('SingletonSocket') || entry.name.startsWith('SingletonCookie')) {
-                try {
-                    fs.unlinkSync(fullPath);
-                    console.log(`[Auth Cleanup] Removed stale lock: ${fullPath}`);
-                } catch (e) {}
-            }
-        }
-    } catch (err) {}
-}
+// Clean stale Chromium locks before initialization
 cleanStaleSingletonLocks(AUTH_DIR);
 
+let latestQrCode: string | null = null;
+let latestQrDataUrl: string | null = null;
+let clientStatus: ClientStatus = 'INITIALIZING';
+let clientInfo: any = null;
+
+// Track bot-generated message IDs to prevent self-trigger loops
+const botSentMessageIds: Set<string> = new Set();
+// User conversation state buffer (stores last uploaded media per user)
+const userMediaState: Map<string, UserMediaSession> = new Map();
 
 // ============================================================================
 // Text Templates (Matching Telegram Bot Experience)
@@ -108,7 +67,7 @@ const HELP_TEXT = (
     `• */cancel* — отменить текущую операцию`
 );
 
-function getStatusMessage() {
+function getStatusMessage(): string {
     const aiStatus = GEMINI_API_KEY ? 'Google Gemini AI Active' : 'Шаблоны (Ключ не задан)';
     let storageUrl = '';
     if (STORAGE_TYPE === 'R2') storageUrl = R2_PUBLIC_DOMAIN;
@@ -128,80 +87,64 @@ function getStatusMessage() {
 }
 
 // ============================================================================
-// Google Gemini AI Caption Generator (REST API)
+// Access Control & Helpers
 // ============================================================================
-async function generateGeminiCaption(instructions, imageBase64 = null, mimeType = 'image/jpeg') {
-    if (!GEMINI_API_KEY) {
-        return (
-            `✨ *Новый день — новые воспоминания!* 🌿\n\n` +
-            `${instructions ? `Тема: ${instructions}\n\n` : ''}` +
-            `Сохраняем самые яркие и душевные моменты, которые остаются в сердце навсегда. ` +
-            `Каждый кадр — это маленькая история, наполненная теплом и вдохновением. ✨\n\n` +
-            `А какие моменты этой недели запомнились вам больше всего? Делитесь в комментариях! 👇\n\n` +
-            `#семья #воспоминания #уют #моменты #фотодня #вдохновение #счастье #family #memories #lifestyle`
-        );
+export function isSenderAllowed(fromNumber: string | null | undefined): boolean {
+    if (!fromNumber) return false;
+    // If ALLOWED_NUMBERS is defined and non-empty, strictly enforce whitelist
+    if (ALLOWED_NUMBERS.length === 0) return true;
+
+    const cleanNumber = String(fromNumber).replace(/[^0-9]/g, '');
+    if (!cleanNumber) return false;
+
+    return ALLOWED_NUMBERS.some(allowed => {
+        const cleanAllowed = String(allowed).replace(/[^0-9]/g, '');
+        if (!cleanAllowed) return false;
+        if (cleanNumber === cleanAllowed) return true;
+        // Compare last 10 digits to handle international prefix variations (+7 / 8, +1, etc.)
+        if (cleanNumber.length >= 10 && cleanAllowed.length >= 10) {
+            return cleanNumber.slice(-10) === cleanAllowed.slice(-10);
+        }
+        return cleanNumber.endsWith(cleanAllowed) || cleanAllowed.endsWith(cleanNumber);
+    });
+}
+
+export function formatChatId(numberOrId: string | null | undefined): string {
+    if (!numberOrId) return '';
+    let clean = String(numberOrId).trim().replace(/[^0-9@c.us@g.us@lid]/g, '');
+    if (!clean.includes('@')) {
+        clean = `${clean.replace(/[^0-9]/g, '')}@c.us`;
     }
+    return clean;
+}
 
-    const systemPrompt = `Вы — профессиональный SMM-копирайтер и контент-мейкер для теплого, эстетичного личного блога в Instagram.
-Темы блога:
-1. Семья и душевность: искренние моменты, детские эмоции, семейные традиции и уют.
-2. Путешествия и воспоминания: красивые виды, впечатления от новых мест, путевые заметки.
-3. Природа и гармония: пейзажи, закаты, море, прогулки, спокойствие.
-4. Отдых и развлечения: яркие выходные, активности, досуг.
-
-Ваша задача — создать вовлекающий, эстетичный пост для Instagram на основе переданной темы/пожеланий и прикрепленного изображения.
-Формат поста:
-- Яркий заголовок с эмодзи.
-- Основной текст (1-2 коротких абзаца, живой, теплый, атмосферный стиль).
-- Интерактивный вопрос или призыв к действию в конце.
-- Блок хештегов (5-10 релевантных хештегов на русском и английском языках).
-Общая длина текста: лаконично, в пределах 600 символов. Язык: РУССКИЙ.`;
-
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-    
-    for (const model of modelsToTry) {
+async function sendBotResponse(msg: Message, replyText: string): Promise<Message | undefined> {
+    try {
+        const sentMsg = await msg.reply(replyText);
+        if (sentMsg?.id?._serialized) {
+            botSentMessageIds.add(sentMsg.id._serialized);
+            // Prune set if it grows large
+            if (botSentMessageIds.size > 2000) {
+                const first = botSentMessageIds.values().next().value;
+                if (first) botSentMessageIds.delete(first);
+            }
+        }
+        return sentMsg;
+    } catch (err: any) {
+        console.error(`[Reply Error] Failed to send reply: ${err.message}`);
         try {
-            const parts = [];
-            if (imageBase64) {
-                parts.push({
-                    inline_data: {
-                        mime_type: mimeType,
-                        data: imageBase64
-                    }
-                });
-            }
-            parts.push({
-                text: `System Prompt: ${systemPrompt}\n\nUser Instructions/Theme: ${instructions || 'Создай душевный пост для публикации'}\n\nСгенерируй готовый пост:`
-            });
-
-            const res = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-                { contents: [{ parts }] },
-                { timeout: 15000 }
-            );
-
-            const caption = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (caption) {
-                return caption.trim();
-            }
-        } catch (err) {
-            console.warn(`[Gemini API] Model ${model} failed (${err.message}), trying next fallback...`);
+            return await client.sendMessage(msg.from, replyText);
+        } catch (e2: any) {
+            console.error(`[SendMessage Error] Fallback send failed: ${e2.message}`);
         }
     }
-
-    return (
-        `✨ *Новый день — новые воспоминания!* 🌿\n\n` +
-        `${instructions ? `Тема: ${instructions}\n\n` : ''}` +
-        `Каждый кадр хранит теплоту и радость настоящего момента. ✨\n\n` +
-        `#семья #воспоминания #моменты #фотодня #family #memories`
-    );
 }
 
 // ============================================================================
-// WhatsApp Client Initialization
+// WhatsApp Client Setup
 // ============================================================================
 console.log('====================================================');
-console.log('  MemoryNMore - WhatsApp Chatbot Connector');
+console.log('  MemoryNMore - WhatsApp Chatbot Connector (TypeScript)');
 console.log('====================================================');
 console.log(`[Config] Auth Directory: ${AUTH_DIR}`);
 console.log(`[Config] Media Directory: ${MEDIA_DIR}`);
@@ -232,21 +175,21 @@ const client = new Client({
 });
 
 // QR Code Event
-client.on('qr', async (qr) => {
+client.on('qr', async (qr: string) => {
     latestQrCode = qr;
     clientStatus = 'QR_READY';
-    
+
     console.log('\n====================================================');
     console.log('  SCAN WHATSAPP QR CODE TO CONNECT:');
     console.log('====================================================');
     qrcodeTerminal.generate(qr, { small: true });
     console.log('----------------------------------------------------');
     console.log(`[QR Ready] You can also scan via Web UI: http://localhost:${PORT}/qr`);
-    console.log('Open WhatsApp on your phone -> Settings -> Linked Devices -> Link a Device\n');
+    console.log('Open WhatsApp on your DEDICATED phone -> Settings -> Linked Devices -> Link a Device\n');
 
     try {
         latestQrDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 8 });
-    } catch (err) {
+    } catch (err: any) {
         console.error('[QR Error] Failed to generate QR data URL:', err.message);
     }
 });
@@ -259,7 +202,7 @@ client.on('authenticated', () => {
     console.log('[WhatsApp] Authentication successful! Loading session...');
 });
 
-client.on('auth_failure', (msg) => {
+client.on('auth_failure', (msg: string) => {
     clientStatus = 'DISCONNECTED';
     console.error(`[WhatsApp] Authentication failure: ${msg}`);
 });
@@ -269,14 +212,14 @@ client.on('ready', async () => {
     latestQrCode = null;
     latestQrDataUrl = null;
     clientInfo = client.info;
-    
+
     console.log('\n====================================================');
     console.log('  WHATSAPP BOT CONNECTED SUCCESSFULLY!');
     console.log(`  Connected as: ${clientInfo?.pushname || 'User'} (${clientInfo?.wid?.user || 'Unknown'})`);
     console.log('====================================================\n');
 });
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', (reason: string) => {
     clientStatus = 'DISCONNECTED';
     console.warn(`[WhatsApp] Client was disconnected: ${reason}`);
     console.log('[WhatsApp] Re-initializing client in 5 seconds...');
@@ -288,48 +231,9 @@ client.on('disconnected', (reason) => {
 });
 
 // ============================================================================
-// Unified Message Processing (Supports incoming & self-sent messages)
+// Incoming & Self Message Handler
 // ============================================================================
-function isSenderAllowed(fromNumber) {
-    if (ALLOWED_NUMBERS.length === 0) return true;
-    const cleanNumber = fromNumber.replace(/[^0-9]/g, '');
-    return ALLOWED_NUMBERS.some(allowed => cleanNumber.endsWith(allowed) || allowed.endsWith(cleanNumber));
-}
-
-function formatChatId(numberOrId) {
-    if (!numberOrId) return '';
-    let clean = String(numberOrId).trim().replace(/[^0-9@c.us@g.us@lid]/g, '');
-    if (!clean.includes('@')) {
-        clean = `${clean.replace(/[^0-9]/g, '')}@c.us`;
-    }
-    return clean;
-}
-
-async function sendBotResponse(msg, replyText) {
-    try {
-        const sentMsg = await msg.reply(replyText);
-        if (sentMsg?.id?._serialized) {
-            botSentMessageIds.add(sentMsg.id._serialized);
-            // Prune set if it grows large
-            if (botSentMessageIds.size > 2000) {
-                const first = botSentMessageIds.values().next().value;
-                botSentMessageIds.delete(first);
-            }
-        }
-        return sentMsg;
-    } catch (err) {
-        console.error(`[Reply Error] Failed to send reply: ${err.message}`);
-        // Fallback: send directly to chat ID
-        try {
-            return await client.sendMessage(msg.from, replyText);
-        } catch (e2) {
-            console.error(`[SendMessage Error] Fallback send failed: ${e2.message}`);
-        }
-    }
-}
-
-// Listen on message_create to capture both incoming messages and self-sent messages from linked device
-client.on('message_create', async (msg) => {
+client.on('message_create', async (msg: Message) => {
     // 1. Filter out system / internal protocol notification types
     const IGNORED_TYPES = ['e2e_notification', 'notification_template', 'call_log', 'protocol', 'gp2', 'ciphertext', 'revoked'];
     if (IGNORED_TYPES.includes(msg.type)) {
@@ -341,30 +245,44 @@ client.on('message_create', async (msg) => {
         return;
     }
 
-    const sender = msg.from;
-    const senderNumber = sender.replace('@c.us', '').replace('@g.us', '').replace('@lid', '');
+    // 3. Ignore status broadcasts, channels, and newsletter updates
+    if (msg.isStatus || msg.from === 'status@broadcast' || msg.from.includes('broadcast') || msg.from.endsWith('@newsletter')) {
+        return;
+    }
+
+    // 4. Ignore group chats (@g.us) to prevent triggering bot on group messages/mentions
+    if (msg.from.endsWith('@g.us') || (msg.author && msg.author.endsWith('@g.us'))) {
+        return;
+    }
+
+    // 5. Extract sender / chat target number
+    const chatTarget = msg.fromMe ? (msg.to || msg.from) : (msg.author || msg.from);
+    const senderNumber = (chatTarget || '').replace('@c.us', '').replace('@g.us', '').replace('@lid', '').replace(/[^0-9]/g, '');
+
+    // 6. Whitelist Validation: Ignore any numbers not present in WHATSAPP_ALLOWED_NUMBERS
+    if (!isSenderAllowed(senderNumber)) {
+        if (ALLOWED_NUMBERS.length > 0) {
+            console.log(`[Access Filter] Ignored message from non-whitelisted number: ${senderNumber}`);
+        }
+        return;
+    }
+
     const body = (msg.body || '').trim();
     const lowerBody = body.toLowerCase();
 
     console.log(`[Message Event] From: ${senderNumber} | Type: ${msg.type} | FromMe: ${msg.fromMe} | Text: "${body.substring(0, 80)}"`);
 
-    // If message is from self (msg.fromMe === true), only process if it looks like a user command or photo to avoid responding to own replies
+    // If message is from self (msg.fromMe === true), ignore own automated bot prefixes
     if (msg.fromMe) {
-        const botPrefixes = ['🌟', '📊', '🏓', '✨', '📸', '🔄', '🏷️', '👥', '💡'];
+        const botPrefixes = ['🌟', '📊', '🏓', '✨', '📸', '🔄', '🏷️', '👥', '💡', '⚠️'];
         if (botPrefixes.some(p => body.startsWith(p))) {
             return;
         }
     }
 
-    // Access control check
-    if (!isSenderAllowed(senderNumber)) {
-        console.warn(`[Access Denied] Number ${senderNumber} is not in ALLOWED_NUMBERS whitelist.`);
-        return;
-    }
-
-    // =========================================================================
+    // -------------------------------------------------------------------------
     // Command Handlers
-    // =========================================================================
+    // -------------------------------------------------------------------------
 
     // 1. Ping Command
     if (['ping', 'пинг'].includes(lowerBody)) {
@@ -412,14 +330,14 @@ client.on('message_create', async (msg) => {
         return;
     }
 
-    // =========================================================================
+    // -------------------------------------------------------------------------
     // Media Message Handler (Photos, Videos, Documents)
-    // =========================================================================
+    // -------------------------------------------------------------------------
     if (msg.hasMedia) {
         try {
             console.log(`[Media Download] Downloading ${msg.type} from ${senderNumber}...`);
             const media = await msg.downloadMedia();
-            
+
             if (media && media.data) {
                 const ext = media.mimetype ? (media.mimetype.split('/')[1] || 'jpg').split(';')[0] : 'jpg';
                 const filename = `wa_${Date.now()}_${senderNumber.slice(-4)}.${ext}`;
@@ -464,16 +382,16 @@ client.on('message_create', async (msg) => {
                 }
                 return;
             }
-        } catch (mediaErr) {
+        } catch (mediaErr: any) {
             console.error('[Media Error] Failed to process media:', mediaErr.message);
             await sendBotResponse(msg, '⚠️ Не удалось загрузить медиафайл. Пожалуйста, попробуйте еще раз.');
             return;
         }
     }
 
-    // =========================================================================
-    // General Text / Instruction Handler
-    // =========================================================================
+    // -------------------------------------------------------------------------
+    // General Text / Guidance Handler
+    // -------------------------------------------------------------------------
     if (body.length > 0) {
         const userState = userMediaState.get(senderNumber);
         const hasRecentMedia = userState && (Date.now() - userState.timestamp < 1000 * 60 * 60); // 1 hour TTL
@@ -503,7 +421,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health / Status endpoint
-app.get(['/health', '/status', '/api/status'], (req, res) => {
+app.get(['/health', '/status', '/api/status'], (_req: Request, res: Response) => {
     res.json({
         success: true,
         status: clientStatus,
@@ -519,7 +437,7 @@ app.get(['/health', '/status', '/api/status'], (req, res) => {
 });
 
 // QR Code View (Web Interface)
-app.get('/qr', (req, res) => {
+app.get('/qr', (_req: Request, res: Response) => {
     if (clientStatus === 'READY' || clientStatus === 'AUTHENTICATED') {
         return res.send(`
             <!DOCTYPE html>
@@ -540,7 +458,7 @@ app.get('/qr', (req, res) => {
                 <div class="card">
                     <div class="badge">CONNECTED</div>
                     <h2>WhatsApp Connected!</h2>
-                    <p>Logged in as <b>${clientInfo?.pushname || 'User'}</b> (+${clientInfo?.wid?.user || 'N/A'}).</p>
+                    <p>Logged in as <b>${clientInfo?.pushname || 'Bot Account'}</b> (+${clientInfo?.wid?.user || 'N/A'}).</p>
                     <p>The bot is operational and ready to send and receive messages.</p>
                 </div>
             </body>
@@ -594,15 +512,15 @@ app.get('/qr', (req, res) => {
         <body>
             <div class="card">
                 <h2>WhatsApp Web Authorization</h2>
-                <p>Scan the QR code below using your mobile WhatsApp application.</p>
+                <p>Scan the QR code below using your dedicated WhatsApp bot phone.</p>
                 <div class="qr-wrapper">
                     <img src="${latestQrDataUrl}" alt="WhatsApp QR Code" />
                 </div>
                 <div class="steps">
                     <ol>
-                        <li>Open <b>WhatsApp</b> on your phone</li>
+                        <li>Open <b>WhatsApp</b> on your dedicated bot phone</li>
                         <li>Tap <b>Settings (or 3 dots)</b> ➔ <b>Linked Devices</b></li>
-                        <li>Tap <b>Link a Device</b> and point camera at the QR code</li>
+                        <li>Tap <b>Link a Device</b> and scan this QR code</li>
                     </ol>
                 </div>
             </div>
@@ -612,9 +530,9 @@ app.get('/qr', (req, res) => {
 });
 
 // Send Text Message API
-app.post(['/send-message', '/api/send-message'], async (req, res) => {
+app.post(['/send-message', '/api/send-message'], async (req: Request, res: Response) => {
     try {
-        const { to, message } = req.body;
+        const { to, message } = req.body as SendMessagePayload;
         if (!to || !message) {
             return res.status(400).json({ success: false, error: "Missing required fields: 'to' and 'message'" });
         }
@@ -624,7 +542,7 @@ app.post(['/send-message', '/api/send-message'], async (req, res) => {
         }
 
         const chatId = formatChatId(to);
-        const response = await client.sendMessage(chatId, message);
+        const response: any = await client.sendMessage(chatId, message);
         if (response?.id?._serialized) {
             botSentMessageIds.add(response.id._serialized);
         }
@@ -632,19 +550,19 @@ app.post(['/send-message', '/api/send-message'], async (req, res) => {
         res.json({
             success: true,
             chatId: chatId,
-            messageId: response.id._serialized,
-            timestamp: response.timestamp
+            messageId: response?.id?._serialized,
+            timestamp: response?.timestamp
         });
-    } catch (err) {
+    } catch (err: any) {
         console.error('[API Send Error]', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
 // Send Media API (from URL or Base64)
-app.post(['/send-media', '/api/send-media'], async (req, res) => {
+app.post(['/send-media', '/api/send-media'], async (req: Request, res: Response) => {
     try {
-        const { to, mediaUrl, base64, mimetype, filename, caption } = req.body;
+        const { to, mediaUrl, base64, mimetype, filename, caption } = req.body as SendMediaPayload;
         if (!to || (!mediaUrl && !base64)) {
             return res.status(400).json({ success: false, error: "Missing required fields: 'to' and either 'mediaUrl' or 'base64'" });
         }
@@ -654,15 +572,17 @@ app.post(['/send-media', '/api/send-media'], async (req, res) => {
         }
 
         const chatId = formatChatId(to);
-        let media;
+        let media: MessageMedia;
 
         if (mediaUrl) {
             media = await MessageMedia.fromUrl(mediaUrl, { unsafeMime: true });
-        } else {
+        } else if (base64) {
             media = new MessageMedia(mimetype || 'image/jpeg', base64, filename || 'media.jpg');
+        } else {
+            return res.status(400).json({ success: false, error: 'No media content provided' });
         }
 
-        const response = await client.sendMessage(chatId, media, { caption: caption || '' });
+        const response: any = await client.sendMessage(chatId, media, { caption: caption || '' });
         if (response?.id?._serialized) {
             botSentMessageIds.add(response.id._serialized);
         }
@@ -670,10 +590,10 @@ app.post(['/send-media', '/api/send-media'], async (req, res) => {
         res.json({
             success: true,
             chatId: chatId,
-            messageId: response.id._serialized,
-            timestamp: response.timestamp
+            messageId: response?.id?._serialized,
+            timestamp: response?.timestamp
         });
-    } catch (err) {
+    } catch (err: any) {
         console.error('[API Send Media Error]', err);
         res.status(500).json({ success: false, error: err.message });
     }

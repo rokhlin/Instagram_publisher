@@ -20,15 +20,19 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Install dependencies first for better Docker cache utilization
-COPY package.json ./
-RUN npm install --omit=dev
+# Install all dependencies (including TypeScript compiler)
+COPY package.json package-lock.json* ./
+RUN npm install
 
-# Copy application files
-COPY bot.js ./
+# Copy source code and build config
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# Compile TypeScript to dist/
+RUN npm run build
 
 # Expose API and QR Web UI port
 EXPOSE 3019
 
-# Run the WhatsApp connector bot
-CMD ["node", "bot.js"]
+# Run compiled WhatsApp connector bot
+CMD ["node", "dist/bot.js"]

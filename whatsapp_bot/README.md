@@ -18,11 +18,17 @@ WhatsApp bot connector for the **MemoryNMore** Instagram AutoPosting ecosystem, 
 
 ## ⚡ Quick Start
 
-### 1. Local Run (Node.js)
+### 1. Local Run (TypeScript / Node.js)
 
 ```bash
 cd whatsapp_bot
 npm install
+
+# For development with live reload:
+npm run dev
+
+# Or build and run production bundle:
+npm run build
 npm start
 ```
 

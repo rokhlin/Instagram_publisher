@@ -1,15 +1,19 @@
 {
   "name": "memorynmore-whatsapp-connector",
   "version": "1.0.0",
-  "description": "WhatsApp chatbot connector for MemoryNMore using whatsapp-web.js and LocalAuth",
-  "main": "bot.js",
+  "description": "TypeScript WhatsApp chatbot connector for MemoryNMore using whatsapp-web.js and LocalAuth",
+  "main": "dist/bot.js",
+  "types": "dist/bot.d.ts",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "node --watch bot.js"
+    "build": "tsc",
+    "start": "node dist/bot.js",
+    "dev": "tsx watch src/bot.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "whatsapp",
     "whatsapp-web.js",
+    "typescript",
     "bot",
     "instagram",
     "autoposting"
@@ -24,5 +28,14 @@
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.26.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }
