@@ -4,6 +4,18 @@ WhatsApp bot connector for the **MemoryNMore** Instagram AutoPosting ecosystem, 
 
 ---
 
+> [!CAUTION]
+> ### ⚠️ DO NOT USE YOUR PERSONAL / MAIN PHONE NUMBER!
+> **Always use a dedicated separate SIM / phone number for this bot.**
+> 
+> Because this connector acts as a linked WhatsApp Web client, **every incoming message, mention, or media posted in your subscribed personal and group chats will be received by the bot and may automatically trigger bot reactions and AI processing.**
+>
+> To avoid accidental auto-replies, privacy leaks, or spamming your contacts and groups:
+> 1. Use a **dedicated bot phone number / virtual SIM**.
+> 2. Configure `WHATSAPP_ALLOWED_NUMBERS` in `.env` to strictly restrict access to authorized phone numbers only.
+
+---
+
 ## ⚡ Quick Start
 
 ### 1. Local Run (Node.js)
@@ -16,7 +28,7 @@ npm start
 
 1. Once started, a **QR code** will print directly in your terminal.
 2. You can also view and scan the QR code via browser at: **`http://localhost:3019/qr`**
-3. Open WhatsApp on your phone: **Settings (or ⋮)** ➔ **Linked Devices** ➔ **Link a Device**.
+3. **Open WhatsApp on your DEDICATED bot phone** *(DO NOT USE YOUR PERSONAL NUMBER)*: **Settings (or ⋮)** ➔ **Linked Devices** ➔ **Link a Device**.
 4. Scan the QR code. The session is saved in `data/whatsapp_auth/` so you won't need to scan again on restarts!
 
 ---
@@ -41,6 +53,9 @@ docker compose logs -f whatsapp-bot
 ```
 Or simply open: `http://localhost:3019/qr`
 
+> [!WARNING]
+> **Reminder:** Scan the QR code using a **dedicated bot number**, never your primary personal WhatsApp account.
+
 ---
 
 ## 🌐 REST API Reference
@@ -55,7 +70,7 @@ Returns client readiness and connection status.
   "status": "READY",
   "is_ready": true,
   "client_info": {
-    "name": "Alex",
+    "name": "Bot Account",
     "phone": "79991234567",
     "platform": "whatsapp"
   }
@@ -93,6 +108,6 @@ Sends an image or video from URL or Base64.
 | `WHATSAPP_PORT` | `3019` | Express HTTP API port |
 | `WHATSAPP_HOST` | `0.0.0.0` | HTTP listen address |
 | `WHATSAPP_AUTH_DIR` | `../data/whatsapp_auth` | Local session persistence directory |
-| `WHATSAPP_ALLOWED_NUMBERS` | `""` | Comma-separated allowed numbers (e.g. `79991234567`). Empty = allow all. |
+| `WHATSAPP_ALLOWED_NUMBERS` | `""` | **Recommended:** Comma-separated allowed numbers (e.g. `79991234567,12025550123`). Restricts bot interactions to authorized users only. Empty = allow all. |
 | `PYTHON_BACKEND_URL` | `""` | Optional Python backend webhook relay URL |
 | `PUPPETEER_EXECUTABLE_PATH` | `undefined` | Path to system Chromium executable (in Docker: `/usr/bin/chromium`) |
