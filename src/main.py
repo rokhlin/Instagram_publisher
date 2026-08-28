@@ -7,7 +7,8 @@ from aiogram.client.default import DefaultBotProperties
 
 from src.config import settings
 from src.communication.telegram import create_telegram_bot_and_dispatcher
-from src.business_logic.storage import start_secure_media_server, run_cleanup_worker
+from src.communication.api_server import start_communication_api_server
+from src.business_logic.storage import run_cleanup_worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,9 +24,9 @@ async def main():
     server_runner = None
     cleanup_task = None
 
-    # 1. Start optional secure local static media web server (Business Logic / Storage)
-    if settings.STORAGE_TYPE.lower() == "local" and settings.LOCAL_SERVER_ENABLED:
-        server_runner = await start_secure_media_server()
+    # 1. Start Communication API & Media Server (exposes AI Engine & Business Logic for WhatsApp / Web)
+    if settings.LOCAL_SERVER_ENABLED or settings.WHATSAPP_ENABLED or settings.STORAGE_TYPE.lower() == "local":
+        server_runner = await start_communication_api_server()
 
     # 2. Start periodic background media cleanup worker (Business Logic / Storage)
     if settings.MEDIA_CLEANUP_ENABLED:

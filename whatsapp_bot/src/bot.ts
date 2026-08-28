@@ -23,10 +23,11 @@ import {
     R2_PUBLIC_DOMAIN,
     S3_PUBLIC_DOMAIN,
     LOCAL_PUBLIC_BASE_URL,
+    PYTHON_BACKEND_URL,
     PUPPETEER_EXECUTABLE_PATH,
     cleanStaleSingletonLocks
 } from './config';
-import { generateGeminiCaption } from './gemini';
+import { generateCaption, getBackendStatus } from './backendClient';
 import { ClientStatus, UserMediaSession, SendMessagePayload, SendMediaPayload } from './types';
 
 // Clean stale Chromium locks before initialization
@@ -365,7 +366,7 @@ client.on('message_create', async (msg: Message) => {
                         `📸 *Медиафайл получен!* (${fileSizeKb} KB)\n` +
                         `Генерирую AI-описание по вашей теме: _«${body}»_... ⏳`
                     );
-                    const aiCaption = await generateGeminiCaption(body, media.data, media.mimetype);
+                    const aiCaption = await generateCaption(body, media.data, media.mimetype);
                     await sendBotResponse(
                         msg,
                         `✨ *Сгенерированное AI-описание для Instagram:*\n\n` +
@@ -400,7 +401,7 @@ client.on('message_create', async (msg: Message) => {
 
         const imageBase64 = hasRecentMedia ? userState.base64 : null;
         const mimeType = hasRecentMedia ? userState.mimetype : 'image/jpeg';
-        const aiCaption = await generateGeminiCaption(body, imageBase64, mimeType);
+        const aiCaption = await generateCaption(body, imageBase64, mimeType);
 
         await sendBotResponse(
             msg,

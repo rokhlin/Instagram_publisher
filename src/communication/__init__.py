@@ -9,6 +9,7 @@ from src.communication.telegram import (
     PostCreationStates,
 )
 from src.communication.whatsapp import WhatsAppService, whatsapp_service
+from src.communication.api_server import start_communication_api_server
 
 __all__ = [
     "BaseCommunicationChannel",
@@ -17,4 +18,5 @@ __all__ = [
     "PostCreationStates",
     "WhatsAppService",
     "whatsapp_service",
+    "start_communication_api_server",
 ]
