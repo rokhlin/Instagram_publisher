@@ -21,7 +21,7 @@ async def setup_bot_commands(bot: Bot) -> None:
     Registers bot command menus for Telegram clients in multiple languages (RU/EN).
     """
     try:
-        commands_list = ["start", "help", "tags", "mentions", "status", "cancel"]
+        commands_list = ["start", "help", "tags", "mentions", "status", "language", "cancel"]
 
         # Russian commands
         ru_commands = [
