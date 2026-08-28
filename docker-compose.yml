@@ -75,6 +75,41 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # ==============================================================================
+  # WhatsApp Connector Service (whatsapp-web.js with LocalAuth session persistence)
+  # ==============================================================================
+  whatsapp-bot:
+    build:
+      context: ./whatsapp
+      dockerfile: Dockerfile
+    container_name: whatsapp_autoposting_bot
+    restart: unless-stopped
+    environment:
+      - WHATSAPP_PORT=3019
+      - WHATSAPP_AUTH_DIR=/app/data/whatsapp_auth
+      - WHATSAPP_ALLOWED_NUMBERS=
+      - PYTHON_BACKEND_URL=http://instagram-bot:3018
+      - TZ=Asia/Jerusalem
+    ports:
+      - "3019:3019"
+    volumes:
+      - ./data/whatsapp_auth:/app/data/whatsapp_auth
+      - ./config:/app/config:ro
+    networks:
+      - bot-network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
 networks:
   bot-network:
     driver: bridge

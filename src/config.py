@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     MEDIA_TTL_MINUTES: int = 120  # Delete files older than 120 minutes (2 hours)
     MEDIA_CLEANUP_INTERVAL_MINUTES: int = 30  # Run cleanup check every 30 minutes
 
+    # =========================================================================
+    # WhatsApp Chatbot Connector Settings
+    # =========================================================================
+    WHATSAPP_ENABLED: bool = False
+    WHATSAPP_CONNECTOR_URL: str = "http://localhost:3019"
+    WHATSAPP_DEFAULT_RECIPIENT: Optional[str] = ""
+
     @property
     def allowed_users(self) -> List[int]:
         if not self.ALLOWED_USER_IDS:

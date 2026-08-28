@@ -54,3 +54,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# whatsapp
+whatsapp/node_modules
+./data/whatsapp_auth/*

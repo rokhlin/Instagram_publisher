@@ -18,7 +18,13 @@ MemoryNMore/
 │   ├── .env                             # Active environment configuration (git ignored)
 │   └── .env.example                     # Configuration template
 ├── data/
-│   └── media/                           # Local temporary media cache
+│   ├── media/                           # Local temporary media cache
+│   └── whatsapp_auth/                   # Persistent WhatsApp Web LocalAuth session
+├── whatsapp/                            # WhatsApp Chatbot Connector (whatsapp-web.js)
+│   ├── package.json                     # Node.js dependencies
+│   ├── bot.js                           # WhatsApp Web client, QR handler & REST API
+│   ├── Dockerfile                       # Headless Chromium container build
+│   └── README.md                        # WhatsApp service documentation
 └── src/
     ├── __init__.py
     ├── main.py                          # Entry point, bot lifecycle, media server & cleanup worker
@@ -35,8 +41,10 @@ MemoryNMore/
         ├── storage_service.py           # Storage backends: Cloudflare R2, AWS S3, or Local
         ├── media_server.py              # Secured HTTP server for serving local media
         ├── cleanup_service.py           # Background worker for TTL-based media cleanup
-        └── instagram_service.py         # Meta Graph API client (container creation & publishing)
+        ├── instagram_service.py         # Meta Graph API client (container creation & publishing)
+        └── whatsapp_service.py          # WhatsApp connector client bridge
 ```
+
 
 ---
 
@@ -119,6 +127,16 @@ All variables can be supplied either via **`config/.env`** or directly as **Dock
 | `MEDIA_CLEANUP_ENABLED` | *Optional* | `true` | Enable background worker that automatically deletes temporary local media files after expiration. |
 | `MEDIA_TTL_MINUTES` | *Optional* | `120` | Time-to-Live (TTL) in minutes before generated media files are deleted (120 = 2 hours). |
 | `MEDIA_CLEANUP_INTERVAL_MINUTES` | *Optional* | `30` | Frequency (in minutes) of background cleanup scans. |
+
+---
+
+### 9. WhatsApp Chatbot Connector (`whatsapp-web.js`)
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `WHATSAPP_ENABLED` | *Optional* | `true` | Enable WhatsApp chatbot integration. |
+| `WHATSAPP_CONNECTOR_URL` | *Optional* | `http://localhost:3019` | Endpoint for the WhatsApp Express REST bridge (in Docker: `http://whatsapp-bot:3019`). |
+| `WHATSAPP_ALLOWED_NUMBERS` | *Optional* | `""` | Comma-separated international phone numbers without `+` (e.g. `79991234567`). Empty = allow all numbers. |
+| `WHATSAPP_PORT` | *Optional* | `3019` | Express HTTP API and QR Web UI port. |
 
 
 ## 📖 Step-by-Step Guide: Setting Up Cloudflare R2
@@ -211,6 +229,25 @@ When running in `STORAGE_TYPE=local` on a home server, NAS (ZimaOS, Synology, Un
    LOCAL_SERVER_PORT=3018
    LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com
    ```
+
+### 5. WhatsApp Bot Setup (`whatsapp-web.js`)
+The WhatsApp connector emulates the official WhatsApp Web client and persists your login session in `data/whatsapp_auth/`.
+
+#### Initial QR Code Authorization:
+1. **Local Node.js Run:**
+   ```bash
+   cd whatsapp
+   npm install
+   npm start
+   ```
+2. **Docker Run:**
+   ```bash
+   docker compose up -d --build whatsapp-bot
+   ```
+3. **Scan QR Code:**
+   - Scan the ASCII QR code printed in the terminal/container logs (`docker compose logs -f whatsapp-bot`), **OR**
+   - Open your browser to **`http://localhost:3019/qr`** to view and scan the graphical QR code directly on your mobile device (**WhatsApp ➔ Linked Devices ➔ Link a Device**).
+4. Once scanned, `LocalAuth` saves the session so you won't need to scan again across restarts.
 
 ---
 

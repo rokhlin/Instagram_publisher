@@ -291,6 +291,52 @@ async def test_storage_and_reachability() -> Tuple[bool, str]:
     return True, "Storage and public URL verified"
 
 
+async def test_whatsapp_connector() -> Tuple[bool, str]:
+    print_section("6. WhatsApp Connector (whatsapp-web.js)")
+
+    if not settings.WHATSAPP_ENABLED:
+        msg = "WhatsApp integration is disabled (WHATSAPP_ENABLED=false)"
+        print_status("WhatsApp Integration", True, msg, warn=True)
+        return True, "Disabled (Optional)"
+
+    connector_url = settings.WHATSAPP_CONNECTOR_URL.rstrip("/")
+    status_url = f"{connector_url}/api/status"
+    print(f"Testing WhatsApp Connector API at {CYAN}{status_url}{RESET}...")
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+            async with session.get(status_url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    status = data.get("status", "UNKNOWN")
+                    is_ready = data.get("is_ready", False)
+                    has_qr = data.get("has_qr", False)
+                    client_info = data.get("client_info") or {}
+
+                    if is_ready:
+                        phone = client_info.get("phone", "N/A")
+                        name = client_info.get("name", "User")
+                        msg = f"Connected as {name} (+{phone}) | Status: READY"
+                        print_status("WhatsApp Client", True, msg)
+                        return True, "Connected & Ready"
+                    elif has_qr:
+                        msg = f"Client is waiting for QR code scan. Open {connector_url}/qr to scan."
+                        print_status("WhatsApp Client", True, msg, warn=True)
+                        return True, "Awaiting QR Scan"
+                    else:
+                        msg = f"Connector is running. Current Status: {status}"
+                        print_status("WhatsApp Client", True, msg, warn=True)
+                        return True, f"Status: {status}"
+                else:
+                    msg = f"Connector returned HTTP {resp.status}"
+                    print_status("WhatsApp Connector", False, msg)
+                    return False, msg
+    except Exception as e:
+        msg = f"Cannot reach WhatsApp connector at {status_url} ({e}). Ensure the Node.js connector or docker service is running."
+        print_status("WhatsApp Connector", False, msg, warn=True)
+        return False, "Unreachable (Check if running)"
+
+
 async def run_all_checks():
     print(f"\n{BOLD}{CYAN}================================================================{RESET}")
     print(f"{BOLD}{CYAN}      MemoryNMore Automated Diagnostic & Debug Suite           {RESET}")
@@ -313,6 +359,10 @@ async def run_all_checks():
     # 5. Storage & Public Reachability Check
     results["Storage"] = await test_storage_and_reachability()
 
+    # 6. WhatsApp Connector Check (if enabled)
+    if settings.WHATSAPP_ENABLED:
+        results["WhatsApp"] = await test_whatsapp_connector()
+
     # Summary
     print_section("Summary & Overall Health")
     all_passed = True
@@ -320,13 +370,15 @@ async def run_all_checks():
         status_text = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"
         if name == "Gemini AI" and "Fallback" in note:
             status_text = f"{YELLOW}WARN (Fallback){RESET}"
+        elif name == "WhatsApp" and ("Awaiting" in note or "Unreachable" in note):
+            status_text = f"{YELLOW}WARN ({note}){RESET}"
         print(f"  • {name:<15}: {status_text} ({note})")
-        if not ok and name != "Gemini AI":
+        if not ok and name not in ("Gemini AI", "WhatsApp"):
             all_passed = False
 
     print(f"\n{CYAN}{'-'*60}{RESET}")
     if all_passed:
-        print(f"{GREEN}{BOLD}🎉 ALL SYSTEMS ARE OPERATIONAL & READY TO POST!{RESET}")
+        print(f"{GREEN}{BOLD}🎉 ALL PRIMARY SYSTEMS ARE OPERATIONAL & READY TO POST!{RESET}")
     else:
         print(f"{RED}{BOLD}⚠️ ONE OR MORE CHECKS FAILED. Please review the errors above.{RESET}")
     print(f"{CYAN}{'-'*60}{RESET}\n")
@@ -334,3 +386,4 @@ async def run_all_checks():
 
 if __name__ == "__main__":
     asyncio.run(run_all_checks())
+
