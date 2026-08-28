@@ -55,6 +55,8 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 
-# whatsapp
-whatsapp/node_modules
+# whatsapp bot
+whatsapp_bot/node_modules/
+whatsapp_bot/package-lock.json
 ./data/whatsapp_auth/*
+

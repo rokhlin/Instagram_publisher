@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
 from src.config import settings
-from src.bot.handlers import router as main_router
+from src.telegram_bot.handlers import router as main_router
 from src.services.media_server import start_secure_media_server
 from src.services.cleanup_service import run_cleanup_worker
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main():
-    logger.info("Starting Instagram AutoPosting Bot...")
+    logger.info("Starting MemoryNMore Service...")
     
     server_runner = None
     cleanup_task = None
@@ -42,35 +42,54 @@ async def main():
         )
         sys.exit(1)
 
+    # 4. Start Telegram Bot if enabled and token provided
     cleaned_token = (settings.BOT_TOKEN or "").strip().strip("'\"")
-    bot = Bot(
-        token=cleaned_token,
-        default=DefaultBotProperties(parse_mode="Markdown")
-    )
-    dp = Dispatcher(storage=MemoryStorage())
-    dp.include_router(main_router)
+    if settings.TELEGRAM_ENABLED and cleaned_token:
+        bot = Bot(
+            token=cleaned_token,
+            default=DefaultBotProperties(parse_mode="Markdown")
+        )
+        dp = Dispatcher(storage=MemoryStorage())
+        dp.include_router(main_router)
 
-    try:
-        # Delete existing webhooks if any and start polling
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("Bot is ready and listening for incoming messages...")
-        await dp.start_polling(bot)
-    finally:
-        # Graceful shutdown of background tasks
-        if cleanup_task and not cleanup_task.done():
-            cleanup_task.cancel()
-            try:
-                await cleanup_task
-            except asyncio.CancelledError:
-                pass
-        
-        if server_runner:
-            await server_runner.cleanup()
-            logger.info("Local media server stopped.")
+        try:
+            # Delete existing webhooks if any and start polling
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("Telegram Bot is ready and listening for incoming messages...")
+            await dp.start_polling(bot)
+        finally:
+            if cleanup_task and not cleanup_task.done():
+                cleanup_task.cancel()
+                try:
+                    await cleanup_task
+                except asyncio.CancelledError:
+                    pass
+            
+            if server_runner:
+                await server_runner.cleanup()
+                logger.info("Local media server stopped.")
+    else:
+        logger.info("Telegram Bot is disabled or BOT_TOKEN is empty. Core services (Media server / Cleanup) running in background.")
+        try:
+            # Keep process alive for media server / cleanup worker
+            while True:
+                await asyncio.sleep(3600)
+        finally:
+            if cleanup_task and not cleanup_task.done():
+                cleanup_task.cancel()
+                try:
+                    await cleanup_task
+                except asyncio.CancelledError:
+                    pass
+            
+            if server_runner:
+                await server_runner.cleanup()
+                logger.info("Local media server stopped.")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot stopped.")
+        logger.info("Service stopped.")
+

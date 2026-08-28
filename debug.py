@@ -113,9 +113,10 @@ async def test_config() -> Tuple[bool, str]:
 
 async def test_telegram_bot() -> Tuple[bool, str]:
     print_section("2. Telegram Bot API Connectivity")
-    if not settings.BOT_TOKEN:
-        print_status("Telegram Bot", False, "BOT_TOKEN not configured in Docker environment or ./config/.env")
-        return False, "BOT_TOKEN missing"
+    if not settings.TELEGRAM_ENABLED or not settings.BOT_TOKEN:
+        msg = "Telegram Bot is disabled or BOT_TOKEN not configured (Optional)"
+        print_status("Telegram Bot", True, msg, warn=True)
+        return True, "Disabled (Optional)"
 
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getMe"
     try:

@@ -1,6 +1,6 @@
-# 📸 Instagram AutoPosting Telegram Bot
+# 📸 Instagram AutoPosting Suite (Telegram & WhatsApp Bots)
 
-An automated Telegram bot for preparing media, generating AI-powered captions with Google Gemini, and publishing posts and stories to Instagram via the official Meta Graph API.
+An automated content publishing suite for preparing media, generating AI-powered captions with Google Gemini, and publishing posts and stories to Instagram via the official Meta Graph API. Supports **Telegram Bot**, **WhatsApp Bot**, or **both together** as independent, modular connectors.
 
 ---
 
@@ -8,9 +8,9 @@ An automated Telegram bot for preparing media, generating AI-powered captions wi
 
 ```
 MemoryNMore/
-├── Dockerfile                           # Python 3.11-slim container build
-├── docker-compose.yml                   # Service launch with volume mounts
-├── requirements.txt                     # Project dependencies
+├── Dockerfile                           # Python 3.11-slim container build (Telegram bot & media server)
+├── docker-compose.yml                   # Service orchestration (telegram-bot, whatsapp-bot)
+├── requirements.txt                     # Python dependencies
 ├── debug.py                             # Automated diagnostics & health check
 ├── .dockerignore                        # Docker build exclusions
 ├── .gitignore                           # Git exclusions
@@ -20,16 +20,16 @@ MemoryNMore/
 ├── data/
 │   ├── media/                           # Local temporary media cache
 │   └── whatsapp_auth/                   # Persistent WhatsApp Web LocalAuth session
-├── whatsapp/                            # WhatsApp Chatbot Connector (whatsapp-web.js)
+├── whatsapp_bot/                        # WhatsApp Chatbot Connector (whatsapp-web.js) [Optional]
 │   ├── package.json                     # Node.js dependencies
 │   ├── bot.js                           # WhatsApp Web client, QR handler & REST API
 │   ├── Dockerfile                       # Headless Chromium container build
-│   └── README.md                        # WhatsApp service documentation
+│   └── README.md                        # Dedicated WhatsApp bot documentation
 └── src/
     ├── __init__.py
     ├── main.py                          # Entry point, bot lifecycle, media server & cleanup worker
     ├── config.py                        # Validation & settings loader (Pydantic Settings)
-    ├── bot/
+    ├── telegram_bot/                    # Telegram Bot Module (aiogram 3) [Optional]
     │   ├── __init__.py
     │   ├── states.py                    # Conversation FSM states
     │   ├── keyboards.py                 # Inline keyboards (formats, actions)
@@ -44,6 +44,19 @@ MemoryNMore/
         ├── instagram_service.py         # Meta Graph API client (container creation & publishing)
         └── whatsapp_service.py          # WhatsApp connector client bridge
 ```
+
+---
+
+## 🔀 Modular Bot Connectors (Independent or Combined)
+
+You can run **either** bot independently or **both** together:
+
+| Mode | Command (Docker) | Command (Local) | Requirements |
+| :--- | :--- | :--- | :--- |
+| **Telegram Only** | `docker compose up -d telegram-bot` | `python -m src.main` | `BOT_TOKEN` |
+| **WhatsApp Only** | `docker compose up -d whatsapp-bot` | `cd whatsapp_bot && npm start` | Scan QR code |
+| **Both Together** | `docker compose up -d` | Run both in separate terminals | `BOT_TOKEN` + Scan QR |
+
 
 
 ---
@@ -230,17 +243,19 @@ When running in `STORAGE_TYPE=local` on a home server, NAS (ZimaOS, Synology, Un
    LOCAL_PUBLIC_BASE_URL=https://media.yourdomain.com
    ```
 
-### 5. WhatsApp Bot Setup (`whatsapp-web.js`)
-The WhatsApp connector emulates the official WhatsApp Web client and persists your login session in `data/whatsapp_auth/`.
+### 5. WhatsApp Bot Setup (`whatsapp-web.js`) [Optional]
+The WhatsApp bot connector emulates the official WhatsApp Web client and persists your login session in `data/whatsapp_auth/`. It is completely optional and can be run independently or alongside the Telegram bot.
 
-#### Initial QR Code Authorization:
+> 📖 **Full WhatsApp Bot Documentation & REST API Reference**: See [whatsapp_bot/README.md](file:///d:/projects/MemoryNMore/whatsapp_bot/README.md).
+
+#### Quick Start & QR Authorization:
 1. **Local Node.js Run:**
    ```bash
-   cd whatsapp
+   cd whatsapp_bot
    npm install
    npm start
    ```
-2. **Docker Run:**
+2. **Docker Compose Run:**
    ```bash
    docker compose up -d --build whatsapp-bot
    ```
@@ -248,6 +263,7 @@ The WhatsApp connector emulates the official WhatsApp Web client and persists yo
    - Scan the ASCII QR code printed in the terminal/container logs (`docker compose logs -f whatsapp-bot`), **OR**
    - Open your browser to **`http://localhost:3019/qr`** to view and scan the graphical QR code directly on your mobile device (**WhatsApp ➔ Linked Devices ➔ Link a Device**).
 4. Once scanned, `LocalAuth` saves the session so you won't need to scan again across restarts.
+
 
 ---
 

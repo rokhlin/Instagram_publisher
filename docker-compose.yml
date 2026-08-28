@@ -1,13 +1,14 @@
 services:
   # ==============================================================================
-  # Primary Service: Instagram Telegram Bot
+  # 1. Telegram Bot Service (Python / aiogram)
   # ==============================================================================
-  instagram-bot:
+  telegram-bot:
     image: ghcr.io/rokhlin/instagram_publisher:latest
-    container_name: instagram_autoposting_bot
+    container_name: telegram_autoposting_bot
     restart: unless-stopped
     environment:
-      # Telegram Bot Configuration
+      # Bot Selection & Telegram Configuration
+      - TELEGRAM_ENABLED=true
       - BOT_TOKEN=
       - ALLOWED_USER_IDS=
 
@@ -76,11 +77,11 @@ services:
         max-file: "5"
 
   # ==============================================================================
-  # WhatsApp Connector Service (whatsapp-web.js with LocalAuth session persistence)
+  # 2. WhatsApp Bot Service (whatsapp-web.js / Node.js)
   # ==============================================================================
   whatsapp-bot:
     build:
-      context: ./whatsapp
+      context: ./whatsapp_bot
       dockerfile: Dockerfile
     container_name: whatsapp_autoposting_bot
     restart: unless-stopped
@@ -88,12 +89,13 @@ services:
       - WHATSAPP_PORT=3019
       - WHATSAPP_AUTH_DIR=/app/data/whatsapp_auth
       - WHATSAPP_ALLOWED_NUMBERS=
-      - PYTHON_BACKEND_URL=http://instagram-bot:3018
+      - PYTHON_BACKEND_URL=http://telegram-bot:3018
       - TZ=Asia/Jerusalem
     ports:
       - "3019:3019"
     volumes:
       - ./data/whatsapp_auth:/app/data/whatsapp_auth
+      - ./data/media:/app/data/media
       - ./config:/app/config:ro
     networks:
       - bot-network
@@ -113,4 +115,5 @@ services:
 networks:
   bot-network:
     driver: bridge
+
 

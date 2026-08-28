@@ -8,8 +8,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 
 from src.config import settings
-from src.bot.states import PostCreationStates
-from src.bot.keyboards import (
+from src.telegram_bot.states import PostCreationStates
+from src.telegram_bot.keyboards import (
     get_language_keyboard,
     get_instructions_keyboard,
     get_format_keyboard,

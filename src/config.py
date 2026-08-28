@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     )
 
     # Telegram Bot
+    TELEGRAM_ENABLED: bool = True
     BOT_TOKEN: str = ""
     ALLOWED_USER_IDS: Optional[str] = ""
 
@@ -162,7 +163,7 @@ class Settings(BaseSettings):
         Returns a list of missing configuration variable names.
         """
         missing = []
-        if not self.BOT_TOKEN:
+        if self.TELEGRAM_ENABLED and not self.BOT_TOKEN:
             missing.append("BOT_TOKEN")
         if not self.IG_USER_ID:
             missing.append("IG_USER_ID")

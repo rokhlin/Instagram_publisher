@@ -9,7 +9,7 @@ WhatsApp bot connector for the **MemoryNMore** Instagram AutoPosting ecosystem, 
 ### 1. Local Run (Node.js)
 
 ```bash
-cd whatsapp
+cd whatsapp_bot
 npm install
 npm start
 ```
@@ -23,10 +23,16 @@ npm start
 
 ### 2. Docker Run (Docker Compose)
 
-Add or enable the `whatsapp-bot` service in `docker-compose.yml`:
+The WhatsApp bot runs independently or alongside the Telegram bot. To run only WhatsApp bot:
 
 ```bash
-docker compose up -d whatsapp-bot
+docker compose up -d --build whatsapp-bot
+```
+
+To run both Telegram and WhatsApp bots together:
+
+```bash
+docker compose up -d --build
 ```
 
 To view the QR code from the container logs:
