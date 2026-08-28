@@ -22,10 +22,10 @@ __pycache__/
 *$py.class
 
 # Application data & generated media
-data/
+data/whatsapp_auth/*
 data/media/*
 !data/media/.gitkeep
-media/
+!data/whatsapp_auth/.gitkeep
 downloads/
 temp/
 logs/
@@ -58,5 +58,5 @@ Desktop.ini
 # whatsapp bot
 whatsapp_bot/node_modules/
 whatsapp_bot/package-lock.json
-./data/whatsapp_auth/*
+
 

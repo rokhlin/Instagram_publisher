@@ -29,8 +29,11 @@ from PIL import Image
 
 try:
     from src.config import settings
-    from src.services.storage_service import storage_service
-    from src.services.ai_service import ai_service
+    from src.business_logic.storage import storage_service
+    from src.ai_engine import ai_engine, get_ai_engine
+    ai_service = ai_engine
+    from src.publishers import instagram_publisher
+    from src.business_logic import orchestrator
 except ImportError as e:
     print(f"\033[91m[CRITICAL] Failed to import project modules: {e}\033[0m")
     sys.exit(1)

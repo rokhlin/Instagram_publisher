@@ -6,9 +6,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
 from src.config import settings
-from src.telegram_bot.handlers import router as main_router
-from src.services.media_server import start_secure_media_server
-from src.services.cleanup_service import run_cleanup_worker
+from src.communication.telegram import create_telegram_bot_and_dispatcher
+from src.business_logic.storage import start_secure_media_server, run_cleanup_worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,11 +23,11 @@ async def main():
     server_runner = None
     cleanup_task = None
 
-    # 1. Start optional secure local static media web server
+    # 1. Start optional secure local static media web server (Business Logic / Storage)
     if settings.STORAGE_TYPE.lower() == "local" and settings.LOCAL_SERVER_ENABLED:
         server_runner = await start_secure_media_server()
 
-    # 2. Start periodic background media cleanup worker (if enabled)
+    # 2. Start periodic background media cleanup worker (Business Logic / Storage)
     if settings.MEDIA_CLEANUP_ENABLED:
         cleanup_task = asyncio.create_task(run_cleanup_worker())
 
@@ -42,16 +41,9 @@ async def main():
         )
         sys.exit(1)
 
-    # 4. Start Telegram Bot if enabled and token provided
-    cleaned_token = (settings.BOT_TOKEN or "").strip().strip("'\"")
-    if settings.TELEGRAM_ENABLED and cleaned_token:
-        bot = Bot(
-            token=cleaned_token,
-            default=DefaultBotProperties(parse_mode="Markdown")
-        )
-        dp = Dispatcher(storage=MemoryStorage())
-        dp.include_router(main_router)
-
+    # 4. Start Communication Layer: Telegram Bot
+    bot, dp = create_telegram_bot_and_dispatcher()
+    if bot and dp:
         try:
             # Delete existing webhooks if any and start polling
             await bot.delete_webhook(drop_pending_updates=True)
@@ -92,4 +84,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Service stopped.")
-

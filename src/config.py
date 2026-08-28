@@ -46,8 +46,16 @@ class Settings(BaseSettings):
     IG_ACCESS_TOKEN: str = ""
     IG_GRAPH_API_VERSION: str = "v21.0"
 
+    # AI Engine Provider Selection: "gemini" or "local_llm"
+    AI_PROVIDER: str = "gemini"
+
     # Google Gemini AI
     GEMINI_API_KEY: Optional[str] = ""
+
+    # Local LLM (OpenAI-compatible: LM Studio / Ollama / vLLM)
+    LOCAL_LLM_URL: str = "http://localhost:1234/v1"
+    LOCAL_LLM_MODEL: str = "local-model"
+    LOCAL_LLM_API_KEY: Optional[str] = "lm-studio"
 
     # Storage Type: "r2", "s3", or "local"
     STORAGE_TYPE: str = "r2"
