@@ -69,8 +69,9 @@ class StorageService:
         """
         Uploads image or video to public storage and returns the public HTTPS URL.
         """
-        if not filename:
-            ext = ".mp4" if is_video else ".jpg"
+        # Generate unique filename if not provided or if generic
+        if not filename or filename in ("post_photo.jpg", "post_video.mp4", "image.jpg", "video.mp4"):
+            ext = ".mp4" if is_video or (filename and filename.endswith(".mp4")) else ".jpg"
             filename = f"media_{uuid.uuid4().hex}{ext}"
 
         if not content_type:
@@ -78,14 +79,13 @@ class StorageService:
             if not content_type:
                 content_type = "video/mp4" if is_video or filename.endswith(".mp4") else "image/jpeg"
 
-        # Always save locally (cache / local storage)
-        local_path = os.path.join(settings.LOCAL_STORAGE_DIR, filename)
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        with open(local_path, "wb") as f:
-            f.write(media_bytes)
-
         # 1. LOCAL STORAGE MODE
         if self.storage_type == "local":
+            local_path = os.path.join(settings.LOCAL_STORAGE_DIR, filename)
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, "wb") as f:
+                f.write(media_bytes)
+
             if not settings.LOCAL_PUBLIC_BASE_URL:
                 raise ValueError(
                     "LOCAL_PUBLIC_BASE_URL is not set! "
