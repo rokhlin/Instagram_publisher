@@ -20,7 +20,15 @@ from src.communication.telegram.keyboards import (
     get_mention_editor_keyboard,
     get_presets_manager_keyboard,
     get_cancel_keyboard,
+    get_style_variant_keyboard,
 )
+from src.business_logic.prompts.styles import (
+    select_style_variants,
+    format_music_recommendation_text,
+    get_style,
+    AI_STYLES_CATALOG,
+)
+from src.business_logic.topics import topic_manager
 from src.business_logic.media import ImageProcessor, ImageService, FONT_REGISTRY, FILTER_REGISTRY
 from src.ai_engine import ai_engine, get_ai_engine
 ai_service = ai_engine
@@ -213,6 +221,32 @@ async def handle_language_command(message: types.Message, state: FSMContext):
 
 
 # ==============================================================================
+# Topic Series Session Commands (тема [описание], тема закрыта)
+# ==============================================================================
+
+@router.message(F.text.func(lambda t: bool(t and (t.strip().lower() in ["тема закрыта", "тема закрыта.", "закрыть тему"] or t.strip() == "/close_topic"))))
+async def handle_topic_close_command(message: types.Message):
+    user_id = message.from_user.id
+    if not is_user_allowed(user_id):
+        return
+    closed = topic_manager.close_topic(user_id)
+    if closed:
+        await message.answer(f"🏁 Тема «{closed.description}» закрыта. Контекст серии сброшен.", parse_mode="Markdown")
+    else:
+        await message.answer("ℹ️ У вас не было активной темы.", parse_mode="Markdown")
+
+
+@router.message(F.text.func(lambda t: bool(t and (t.strip().lower().startswith("тема ") or t.strip().lower().startswith("тема:") or t.strip().lower() == "тема"))))
+async def handle_topic_start_command(message: types.Message):
+    user_id = message.from_user.id
+    if not is_user_allowed(user_id):
+        return
+    is_new, msg_info, session = topic_manager.handle_topic_command(user_id, message.text)
+    await message.answer(f"📌 {msg_info}", parse_mode="Markdown")
+
+
+
+# ==============================================================================
 # Media Receivers (Photos, Videos, Documents & Albums/Media Groups)
 # ==============================================================================
 
@@ -299,6 +333,15 @@ async def _process_collected_media_group(media_group_id: str, bot: Bot, state: F
     photos_count = sum(1 for m in media_items if not m["is_video"])
     videos_count = sum(1 for m in media_items if m["is_video"])
 
+    active_topic = topic_manager.get_active_session(user_id)
+    if active_topic:
+        for item in media_items:
+            active_topic.add_media(item)
+        if not user_instructions and active_topic.description:
+            user_instructions = active_topic.description
+
+    active_filter = active_topic.locked_style if (active_topic and active_topic.locked_style) else "ORIGINAL"
+
     await state.clear()
     await state.update_data(
         media_items=media_items,
@@ -307,7 +350,7 @@ async def _process_collected_media_group(media_group_id: str, bot: Bot, state: F
         cover_image_bytes=cover_image_bytes,
         instructions=user_instructions,
         language=user_lang,
-        active_filter="ORIGINAL",
+        active_filter=active_filter,
         active_font="MODERN"
     )
     await state.set_state(PostCreationStates.waiting_for_language)
@@ -357,6 +400,16 @@ async def handle_single_photo(message: types.Message, state: FSMContext, bot: Bo
         "filename": "post_photo.jpg"
     }]
 
+    active_topic = topic_manager.get_active_session(user_id)
+    initial_instructions = message.caption or ""
+    initial_filter = "ORIGINAL"
+    if active_topic:
+        active_topic.add_media(media_items[0])
+        if not initial_instructions and active_topic.description:
+            initial_instructions = active_topic.description
+        if active_topic.locked_style:
+            initial_filter = active_topic.locked_style
+
     await state.clear()
     await state.update_data(
         raw_image_bytes=raw_image_bytes,
@@ -364,9 +417,9 @@ async def handle_single_photo(message: types.Message, state: FSMContext, bot: Bo
         is_album=False,
         has_video=False,
         cover_image_bytes=raw_image_bytes,
-        instructions=message.caption or "",
+        instructions=initial_instructions,
         language=user_lang,
-        active_filter="ORIGINAL",
+        active_filter=initial_filter,
         active_font="MODERN"
     )
     await state.set_state(PostCreationStates.waiting_for_language)
@@ -407,14 +460,24 @@ async def handle_single_video(message: types.Message, state: FSMContext, bot: Bo
 
     await status_msg.delete()
 
+    active_topic = topic_manager.get_active_session(user_id)
+    initial_instructions = message.caption or ""
+    initial_filter = "ORIGINAL"
+    if active_topic:
+        active_topic.add_media(media_items[0])
+        if not initial_instructions and active_topic.description:
+            initial_instructions = active_topic.description
+        if active_topic.locked_style:
+            initial_filter = active_topic.locked_style
+
     await state.clear()
     await state.update_data(
         media_items=media_items,
         is_album=False,
         has_video=True,
-        instructions=message.caption or "",
+        instructions=initial_instructions,
         language=user_lang,
-        active_filter="ORIGINAL",
+        active_filter=initial_filter,
         active_font="MODERN"
     )
     await state.set_state(PostCreationStates.waiting_for_language)
@@ -643,6 +706,11 @@ async def handle_format_selected(callback: types.CallbackQuery, state: FSMContex
         )
         has_photo_text = bool(photo_overlay_text)
 
+    # Check if active topic has locked style
+    active_topic = topic_manager.get_active_session(callback.from_user.id)
+    if active_topic and active_topic.locked_style:
+        active_filter = active_topic.locked_style
+
     # Render media items with filter and font
     processed_items, cover_image_bytes = render_media_items(
         media_items=media_items,
@@ -715,6 +783,42 @@ async def handle_format_selected(callback: types.CallbackQuery, state: FSMContex
         active_font=active_font,
         language=lang
     )
+
+    # 3-Style Variants Selection
+    if not (active_topic and active_topic.locked_style):
+        variants = select_style_variants(media_items=media_items, instructions=instructions, count=3)
+        sample_img = next((m["bytes"] for m in media_items if not m.get("is_video", False)), raw_image_bytes)
+        if sample_img:
+            intro_text = (
+                "🎨 *Система подобрала 3 подходящих стиля обработки:*\n"
+                "Выберите вариант для публикации или примените ко всей теме:"
+                if lang == "ru" else
+                "🎨 *System selected 3 editing styles:*\n"
+                "Select a style for this post or apply it to the entire topic:"
+            )
+            await callback.message.answer(intro_text, parse_mode="Markdown")
+
+            has_video_in_post = any(m.get("is_video", False) for m in media_items)
+            for idx, var in enumerate(variants, 1):
+                v_id = var["id"]
+                v_name = var["name_ru"] if lang == "ru" else var["name_en"]
+                v_vibe = var["vibe"]
+                v_bytes = ImageProcessor.process_image(sample_img, post_type=post_type, filter_name=v_id)
+                v_caption = f"✨ *Вариант {idx}: {v_name}*\n_{v_vibe}_"
+                if has_video_in_post:
+                    v_caption += f"\n\n{format_music_recommendation_text(v_id, lang=lang)}"
+
+                v_kb = get_style_variant_keyboard(v_id, is_topic_active=bool(active_topic), language=lang)
+                try:
+                    await callback.message.answer_photo(
+                        photo=BufferedInputFile(v_bytes, filename=f"variant_{idx}.jpg"),
+                        caption=v_caption,
+                        reply_markup=v_kb,
+                        parse_mode="Markdown"
+                    )
+                except Exception as ex:
+                    logger.warning("Error sending variant preview %d: %s", idx, ex)
+
 
 
 async def send_post_preview(
@@ -858,6 +962,118 @@ async def handle_apply_filter(callback: types.CallbackQuery, state: FSMContext):
         active_font=active_font,
         language=lang
     )
+
+
+@router.callback_query(F.data.startswith("apply_style_var_"))
+async def handle_select_style_variant(callback: types.CallbackQuery, state: FSMContext):
+    new_style = callback.data.replace("apply_style_var_", "")
+    data = await state.get_data()
+    media_items = data.get("media_items", [])
+    post_type = data.get("post_type", "FEED_PORTRAIT")
+    has_photo_text = data.get("has_photo_text", False)
+    photo_overlay_text = data.get("photo_overlay_text", "")
+    active_font = data.get("active_font", "MODERN")
+    lang = get_user_language(user_id=callback.from_user.id, state_lang=data.get("language"))
+
+    style_info = get_style(new_style) or FILTER_REGISTRY.get(new_style, {})
+    style_name = style_info.get("name_ru" if lang == "ru" else "name_en", new_style)
+    await callback.answer(f"✨ Выбран стиль: {style_name}")
+
+    # Re-render media items with chosen style filter
+    processed_items, cover_image_bytes = render_media_items(
+        media_items=media_items,
+        post_type=post_type,
+        has_photo_text=has_photo_text,
+        photo_overlay_text=photo_overlay_text,
+        active_filter=new_style,
+        active_font=active_font
+    )
+
+    await state.update_data(
+        media_items=processed_items,
+        active_filter=new_style,
+        cover_image_bytes=cover_image_bytes
+    )
+    await state.set_state(PostCreationStates.waiting_for_approval)
+
+    format_name = get_localized_format_name(post_type, len(media_items), lang)
+    active_tags = data.get("active_tags", [])
+    active_mentions = data.get("active_mentions", [])
+    caption = data.get("caption", "")
+    has_photos = any(not m.get("is_video", False) for m in media_items)
+
+    await send_post_preview(
+        target=callback.message,
+        cover_image_bytes=cover_image_bytes,
+        format_name=format_name,
+        caption=caption,
+        active_tags_count=len(active_tags),
+        active_mentions_count=len(active_mentions),
+        media_count=len(media_items),
+        show_photo_text_button=has_photos,
+        has_photo_text=has_photo_text,
+        active_filter=new_style,
+        active_font=active_font,
+        language=lang
+    )
+
+
+@router.callback_query(F.data.startswith("apply_topic_var_"))
+async def handle_apply_topic_variant(callback: types.CallbackQuery, state: FSMContext):
+    new_style = callback.data.replace("apply_topic_var_", "")
+    user_id = callback.from_user.id
+    topic_manager.set_topic_style(user_id, new_style)
+
+    data = await state.get_data()
+    media_items = data.get("media_items", [])
+    post_type = data.get("post_type", "FEED_PORTRAIT")
+    has_photo_text = data.get("has_photo_text", False)
+    photo_overlay_text = data.get("photo_overlay_text", "")
+    active_font = data.get("active_font", "MODERN")
+    lang = get_user_language(user_id=user_id, state_lang=data.get("language"))
+
+    style_info = get_style(new_style) or FILTER_REGISTRY.get(new_style, {})
+    style_name = style_info.get("name_ru" if lang == "ru" else "name_en", new_style)
+    await callback.answer(f"🎯 Стиль «{style_name}» зафиксирован для всей темы!")
+
+    # Re-render media items with chosen style filter
+    processed_items, cover_image_bytes = render_media_items(
+        media_items=media_items,
+        post_type=post_type,
+        has_photo_text=has_photo_text,
+        photo_overlay_text=photo_overlay_text,
+        active_filter=new_style,
+        active_font=active_font
+    )
+
+    await state.update_data(
+        media_items=processed_items,
+        active_filter=new_style,
+        cover_image_bytes=cover_image_bytes
+    )
+    await state.set_state(PostCreationStates.waiting_for_approval)
+
+    format_name = get_localized_format_name(post_type, len(media_items), lang)
+    active_tags = data.get("active_tags", [])
+    active_mentions = data.get("active_mentions", [])
+    caption = data.get("caption", "")
+    has_photos = any(not m.get("is_video", False) for m in media_items)
+
+    await send_post_preview(
+        target=callback.message,
+        cover_image_bytes=cover_image_bytes,
+        format_name=format_name,
+        caption=caption,
+        active_tags_count=len(active_tags),
+        active_mentions_count=len(active_mentions),
+        media_count=len(media_items),
+        show_photo_text_button=has_photos,
+        has_photo_text=has_photo_text,
+        active_filter=new_style,
+        active_font=active_font,
+        language=lang
+    )
+
 
 
 # ==============================================================================

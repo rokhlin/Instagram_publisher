@@ -59,20 +59,62 @@ FONT_REGISTRY = {
 }
 
 FILTER_REGISTRY = {
-    "ORIGINAL": {
-        "name_ru": "🔘 Оригинал",
-        "name_en": "🔘 Original",
-        "desc": "Natural balanced colors"
+    # 10 Official Creator Styles
+    "CLEAN_COMMERCIAL": {
+        "name_ru": "🏢 Чистый коммерческий",
+        "name_en": "🏢 Clean Commercial",
+        "desc": "Minimalist high clarity & studio lighting"
+    },
+    "WARM_CAFE": {
+        "name_ru": "☕️ Теплый кофейный уют",
+        "name_en": "☕️ Warm Cafe Lifestyle",
+        "desc": "Morning window light & cozy tones"
+    },
+    "STREET_35MM": {
+        "name_ru": "📸 35мм уличный",
+        "name_en": "📸 35mm Street Editorial",
+        "desc": "Authentic film grain & muted street tones"
     },
     "GOLDEN_HOUR": {
         "name_ru": "☀️ Золотой час",
         "name_en": "☀️ Golden Hour",
         "desc": "Warm sunlight glow & golden tones"
     },
+    "ATHLETIC_DRIVE": {
+        "name_ru": "⚡️ Спортивный драйв",
+        "name_en": "⚡️ High-Energy Fitness",
+        "desc": "High contrast & dynamic punch"
+    },
+    "GOURMET_FOODIE": {
+        "name_ru": "🥐 Аппетитный гурман",
+        "name_en": "🥐 Gourmet Foodie",
+        "desc": "Warm rich highlights & culinary glaze"
+    },
+    "LUXURY_STUDIO": {
+        "name_ru": "💎 Темный люкс",
+        "name_en": "💎 Dark & Moody Luxury",
+        "desc": "Deep blacks & elegant chiaroscuro"
+    },
+    "TECH_CREATOR": {
+        "name_ru": "💻 Техно-креатор",
+        "name_en": "💻 Tech Creator",
+        "desc": "Cool modern tones & crisp sharpness"
+    },
+    "BOTANICAL_SPA": {
+        "name_ru": "🌿 Свежий спа",
+        "name_en": "🌿 Fresh Botanical Spa",
+        "desc": "Bright airy daylight & organic calm"
+    },
     "VINTAGE_FILM": {
         "name_ru": "🎞 Винтаж / Плёнка",
         "name_en": "🎞 Vintage Film",
         "desc": "Analog film tones & soft shadows"
+    },
+    # Backwards-compatible aliases
+    "ORIGINAL": {
+        "name_ru": "🔘 Оригинал",
+        "name_en": "🔘 Original",
+        "desc": "Natural balanced colors"
     },
     "CINEMATIC": {
         "name_ru": "🌊 Кинематограф",
@@ -133,7 +175,35 @@ class ImageProcessor:
         img = img.convert("RGB")
         filter_name = filter_name.upper()
 
-        if filter_name == "GOLDEN_HOUR":
+        if filter_name == "CLEAN_COMMERCIAL":
+            enhanced = ImageEnhance.Contrast(img).enhance(1.08)
+            enhanced = ImageEnhance.Brightness(enhanced).enhance(1.04)
+            enhanced = ImageEnhance.Sharpness(enhanced).enhance(1.20)
+            enhanced = ImageEnhance.Color(enhanced).enhance(1.02)
+            return enhanced
+
+        elif filter_name == "WARM_CAFE":
+            r, g, b = img.split()
+            r = r.point(lambda i: min(255, int(i * 1.06 + 8)))
+            g = g.point(lambda i: min(255, int(i * 1.02 + 2)))
+            b = b.point(lambda i: max(0, int(i * 0.94 - 4)))
+            merged = Image.merge("RGB", (r, g, b))
+            merged = ImageEnhance.Contrast(merged).enhance(1.04)
+            merged = ImageEnhance.Color(merged).enhance(1.10)
+            return merged
+
+        elif filter_name == "STREET_35MM":
+            r, g, b = img.split()
+            r = r.point(lambda i: int(i * 0.96 + 10))
+            g = g.point(lambda i: int(i * 0.95 + 8))
+            b = b.point(lambda i: int(i * 0.92 + 12))
+            merged = Image.merge("RGB", (r, g, b))
+            merged = ImageEnhance.Contrast(merged).enhance(0.98)
+            merged = ImageEnhance.Color(merged).enhance(0.90)
+            merged = ImageEnhance.Sharpness(merged).enhance(1.22)
+            return merged
+
+        elif filter_name == "GOLDEN_HOUR":
             # Warm golden tint: boost red and green slightly, lower blue
             r, g, b = img.split()
             r = r.point(lambda i: min(255, int(i * 1.08 + 10)))
@@ -144,10 +214,50 @@ class ImageProcessor:
             merged = ImageEnhance.Color(merged).enhance(1.15)
             return merged
 
+        elif filter_name == "ATHLETIC_DRIVE":
+            enhanced = ImageEnhance.Contrast(img).enhance(1.24)
+            enhanced = ImageEnhance.Sharpness(enhanced).enhance(1.28)
+            enhanced = ImageEnhance.Color(enhanced).enhance(1.14)
+            return enhanced
+
+        elif filter_name == "GOURMET_FOODIE":
+            r, g, b = img.split()
+            r = r.point(lambda i: min(255, int(i * 1.05 + 6)))
+            g = g.point(lambda i: min(255, int(i * 1.02 + 2)))
+            merged = Image.merge("RGB", (r, g, b))
+            merged = ImageEnhance.Brightness(merged).enhance(1.03)
+            merged = ImageEnhance.Contrast(merged).enhance(1.10)
+            merged = ImageEnhance.Color(merged).enhance(1.22)
+            merged = ImageEnhance.Sharpness(merged).enhance(1.16)
+            return merged
+
+        elif filter_name == "LUXURY_STUDIO":
+            enhanced = ImageEnhance.Brightness(img).enhance(0.93)
+            enhanced = ImageEnhance.Contrast(enhanced).enhance(1.28)
+            enhanced = ImageEnhance.Color(enhanced).enhance(0.96)
+            enhanced = ImageEnhance.Sharpness(enhanced).enhance(1.20)
+            return enhanced
+
+        elif filter_name == "TECH_CREATOR":
+            r, g, b = img.split()
+            b = b.point(lambda i: min(255, int(i * 1.04 + 6)))
+            merged = Image.merge("RGB", (r, g, b))
+            merged = ImageEnhance.Contrast(merged).enhance(1.12)
+            merged = ImageEnhance.Sharpness(merged).enhance(1.28)
+            merged = ImageEnhance.Color(merged).enhance(1.04)
+            return merged
+
+        elif filter_name == "BOTANICAL_SPA":
+            glow = img.filter(ImageFilter.GaussianBlur(radius=6))
+            blended = Image.blend(img, glow, alpha=0.20)
+            blended = ImageEnhance.Brightness(blended).enhance(1.06)
+            blended = ImageEnhance.Contrast(blended).enhance(1.02)
+            blended = ImageEnhance.Color(blended).enhance(1.10)
+            return blended
+
         elif filter_name == "VINTAGE_FILM":
             # Analog film look: slightly muted colors, warm faded shadows
             r, g, b = img.split()
-            # Lift deep shadows, soft compress highlights
             r = r.point(lambda i: int(i * 0.95 + 16))
             g = g.point(lambda i: int(i * 0.93 + 12))
             b = b.point(lambda i: int(i * 0.88 + 18))

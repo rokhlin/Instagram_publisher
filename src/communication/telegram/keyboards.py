@@ -297,3 +297,24 @@ def get_cancel_keyboard(language: str = "ru") -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def get_style_variant_keyboard(style_id: str, is_topic_active: bool = False, language: str = "ru") -> InlineKeyboardMarkup:
+    """
+    Returns inline buttons for variant preview messages:
+    - [✨ Выбрать этот стиль]
+    - [🎯 Применить ко всей теме] (if topic session is active)
+    """
+    is_ru = language.lower().startswith("ru")
+    select_text = "✨ Выбрать этот стиль" if is_ru else "✨ Select this style"
+    topic_text = "🎯 Применить ко всей теме" if is_ru else "🎯 Apply to entire topic"
+
+    rows = [
+        [InlineKeyboardButton(text=select_text, callback_data=f"apply_style_var_{style_id}")]
+    ]
+    if is_topic_active:
+        rows.append(
+            [InlineKeyboardButton(text=topic_text, callback_data=f"apply_topic_var_{style_id}")]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
